@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Session Manager",
+    "description": "Manage every DSH session from one Settings page: generate titles, archive or restore, move a cold session to another workspace, and permanently delete archived sessions."
+  }
+}

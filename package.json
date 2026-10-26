@@ -1,0 +1,78 @@
+{
+  "name": "dsh-session-mng",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Session management for DeepSeek Harness: one Settings page for every session — whole-session title generation, archive/restore, cross-workspace move, and permanent deletion of archived sessions.",
+  "license": "MIT",
+  "author": "ZilongYang",
+  "icon": "./icon.svg",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZilongYang/dsh-session-mng.git"
+  },
+  "homepage": "https://github.com/ZilongYang/dsh-session-mng#readme",
+  "bugs": {
+    "url": "https://github.com/ZilongYang/dsh-session-mng/issues"
+  },
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "session",
+    "archive",
+    "title",
+    "workspace",
+    "web",
+    "cordis"
+  ],
+  "engines": {
+    "node": ">=20.3"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "lib",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "screenshots.json",
+    "assets",
+    "README.md",
+    "CHANGELOG.md",
+    "ROADMAP.md",
+    "LICENSE",
+    "docs"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-workspace"
+      ]
+    },
+    "compatibility": {
+      "dsh": ">=0.2.0-rc.1 <0.3.0-0",
+      "dshReleases": {
+        "0.2.1-rc.2": "compatible"
+      }
+    }
+  }
+}

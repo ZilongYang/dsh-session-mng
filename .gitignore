@@ -1,0 +1,12 @@
+# Private: raw plans, redaction notes, local test evidence.
+/private/
+
+# DSH's file sandbox blocks the default npm cache; commands must point here.
+.npm-cache/
+
+# System and editor files
+.DS_Store
+*.log
+
+# Dependency trees (this package has none; keep the repo clean)
+node_modules/

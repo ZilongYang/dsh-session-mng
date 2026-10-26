@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Session Manager">
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#0f766e"/>
+  <g fill="none" stroke="#e6fffb" stroke-width="2.6" stroke-linecap="round">
+    <rect x="14" y="15" width="36" height="10" rx="3"/>
+    <rect x="14" y="28" width="36" height="10" rx="3"/>
+    <rect x="14" y="41" width="23" height="10" rx="3"/>
+  </g>
+  <g fill="#e6fffb">
+    <circle cx="19.5" cy="20" r="1.7"/>
+    <circle cx="19.5" cy="33" r="1.7"/>
+    <circle cx="19.5" cy="46" r="1.7"/>
+  </g>
+  <path d="M46 42.5l3 3 6-6.5" fill="none" stroke="#2dd4bf" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
