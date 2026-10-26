@@ -126,4 +126,5 @@ curl -s https://awesome-dsh-plugin.com/plugins.json | grep -i session-mng
 - 本地提交：`cea99f9 fix: align sticky surface and enlarge list controls`（功能提交 `d36e725`）。
 - `npm publish`：`dsh-session-mng@0.1.1`，31 个文件，tarball 560.7 kB / unpacked 767.4 kB；发布后约 90 秒 packument 出现 0.1.1，`latest` = 0.1.1，版本端点 200。
 - Git：main 已 push；tag `v0.1.1`；GitHub Release 见仓库 Releases。
-- marketplace：PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 不变；市场卡片读取 npm 版本，合并后显示 0.1.1。
+- marketplace：PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 不变；`check` 已通过，`Submission gate` 仅因仓库 0.0 天（需要 1 天）失败；该检查会自动重跑，约 24h 后转绿，不需要重新提交。
+- Release：https://github.com/ZilongYang/dsh-session-mng/releases/tag/v0.1.1
