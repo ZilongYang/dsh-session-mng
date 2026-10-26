@@ -118,3 +118,12 @@ curl -s https://awesome-dsh-plugin.com/plugins.json | grep -i session-mng
 - [ ] PR 编号 / 合并状态 / CI 结果
 - [ ] dshmarket 卡片截图或文本记录
 - [ ] `docs/PLAN-2026-10-26.md` 末尾追加「事后差异（补记）」
+
+## 7. 0.1.1 更新发布（2026-10-27）
+
+0.1.1 是客户端可用性修复（工作区优先/分页、sticky、选择裁剪、控件视觉），Host API 未变，marketplace 条目不需要改 YAML。
+
+- 本地提交：`cea99f9 fix: align sticky surface and enlarge list controls`（功能提交 `d36e725`）。
+- `npm publish`：`dsh-session-mng@0.1.1`，31 个文件，tarball 560.7 kB / unpacked 767.4 kB；发布后约 90 秒 packument 出现 0.1.1，`latest` = 0.1.1，版本端点 200。
+- Git：main 已 push；tag `v0.1.1`；GitHub Release 见仓库 Releases。
+- marketplace：PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 不变；市场卡片读取 npm 版本，合并后显示 0.1.1。

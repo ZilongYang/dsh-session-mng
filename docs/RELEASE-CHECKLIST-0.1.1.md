@@ -35,8 +35,8 @@
 
 ## D. 发布
 
-- [x] `npm --cache /tmp/dsh-npm-cache pack --dry-run`：31 个文件 / 560.8 kB / unpacked 766.6 kB；包含 4 张截图。
-- [ ] `npm publish` 0.1.1；验证 `registry.npmjs.org/dsh-session-mng/0.1.1`。
-- [ ] Git commit + `git push origin main` + tag `v0.1.1` + GitHub Release。
-- [ ] 确认 npm `latest` = 0.1.1；marketplace 条目无需改 YAML（npm 版本自动更新）。
-- [ ] 在 `docs/02-open-source-and-marketplace.md` 记录 0.1.1 发布结果。
+- [x] `npm --cache /tmp/dsh-npm-cache pack --dry-run`：31 个文件 / 560.8 kB；npm 发布实际 tarball 560.7 kB / unpacked 767.4 kB；包含 4 张截图。
+- [x] `npm publish` 0.1.1（`+ dsh-session-mng@0.1.1`）；版本端点 HTTP 200，`latest` = 0.1.1，`dist.fileCount` = 31。发布后约 90 秒 packument 才出现 0.1.1（与 0.1.0 相同的 staged 处理）。
+- [x] Git commit `cea99f9` + push main + tag `v0.1.1` + GitHub Release（见发布记录）。
+- [x] 确认 npm `latest` = 0.1.1；marketplace 条目无需改 YAML，市场卡片版本随 npm 自动更新。
+- [x] 在 `docs/02-open-source-and-marketplace.md` 记录 0.1.1 发布结果。
