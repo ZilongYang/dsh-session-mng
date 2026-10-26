@@ -202,3 +202,16 @@ targetDir  = dirname(locate({id, cwd: target.path}))
 - workspace 缓存 seam 是版本敏感点；升级 DSH 后先跑测试与实机验收。
 - 侧栏标题在冷会话重命名后可能要刷新页面才更新（与宿主投影缓存有关）。
 - 0.2.0 候选：侧栏菜单、内容搜索、导出、pin、整枝移动、体检/修复。
+
+## 13. 列表视图与选择语义（0.1.1）
+
+0.1.1 在 Client 内新增纯函数 `computeView`，把“过滤 → 排序 → 分组 → 折叠 → 每组分页 → 可见集”集中到一处，避免选择集与过滤条件各算各的。
+
+- **默认折叠**：`totals.all > 100` 时 `expanded === null` 解释为全部折叠；`<= 100` 解释为全部展开。用户点击后 `expanded` 变成显式 Set。
+- **每组分页**：`limits[groupId]` 默认 50，`加载更多` 每次 +50；只影响 `renderedRows`，不影响 `visibleRows`。
+- **可见集**：`visibleRows = 过滤结果 ∩ 已展开工作区`；搜索时所有命中工作区强制展开（并禁用折叠按钮）。
+- **选择裁剪**：`viewKey` 由 `generatedAt + tab + workspaceFilter + query + includeSubagents + defaultExpanded + expanded` 组成；变化后 `selected = selected ∩ visibleIdSet`，隐藏会话自动取消选择。
+- **批量操作**：只使用 `visibleRows` 中的已选行；`全选当前列表` 只选可见集；批量条提示“选择仅作用于当前筛选与展开结果”。
+- **吸附**：过滤工具栏与批量条包在同一个 `.dsm-sticky`（`position: sticky; top: 0`）中，滚动时整体吸在设置弹窗内容区顶部；批量条不再是独立 sticky。
+
+0.2.0 会把 `state` 拆成“工作区概览 + 按工作区分页 sessions”，`computeView` 的过滤/分组逻辑保留，但数据来源从全量数组改为服务端页 + 缓存。

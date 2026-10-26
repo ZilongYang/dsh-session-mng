@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-mng",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Session management for DeepSeek Harness: one Settings page for every session — whole-session title generation, archive/restore, cross-workspace move, and permanent deletion of archived sessions.",
   "license": "MIT",

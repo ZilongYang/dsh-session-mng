@@ -20,6 +20,8 @@ window.__ModuleLoader__.load({
     const NS = 'dsh-session-mng'
     const API = '/session-mng/api'
     const STYLE_ID = 'dsh-session-mng-style'
+    const GROUP_PAGE_SIZE = 50
+    const DEFAULT_COLLAPSE_AFTER = 100
 
     const DICT = {
       zh: {
@@ -43,6 +45,11 @@ window.__ModuleLoader__.load({
         sortTitle: '标题',
         showSubagents: '显示子会话',
         selectAll: '全选当前列表',
+        expandAll: '展开全部',
+        collapseAll: '收起全部',
+        loadMore: '加载更多（剩余 {n} 条）',
+        selectionScopeHint: '选择仅作用于当前筛选与展开结果。',
+        searchAutoExpand: '搜索时自动展开命中工作区。',
         selectRow: '选择会话 {name}',
         justNow: '刚刚',
         titleApplied: '标题已写入。',
@@ -152,6 +159,7 @@ window.__ModuleLoader__.load({
         timeout: '模型调用超时。',
         llmError: '模型调用失败：{message}',
         liveHint: '已打开的会话不能移动或彻底删除；重启 DSH 后重试。',
+        moveUnavailableHint: '所选会话中存在不可移动项（如跨工作区、有子会话或状态未就绪）。',
         archiveHint: '归档后会话会从活跃列表移到已归档，可在本页恢复。',
         moveArchivedHint: '移动不会改变归档状态，会话仍会留在已归档。',
         working: '处理中…',
@@ -185,6 +193,11 @@ window.__ModuleLoader__.load({
         sortTitle: 'Title',
         showSubagents: 'Show subagent sessions',
         selectAll: 'Select all shown',
+        expandAll: 'Expand all',
+        collapseAll: 'Collapse all',
+        loadMore: 'Load {n} more',
+        selectionScopeHint: 'Selection applies to the current filter and expanded workspaces.',
+        searchAutoExpand: 'Matching workspaces expand automatically while searching.',
         selectRow: 'Select session {name}',
         justNow: 'just now',
         titleApplied: 'Title applied.',
@@ -294,6 +307,7 @@ window.__ModuleLoader__.load({
         timeout: 'The model call timed out.',
         llmError: 'The model call failed: {message}',
         liveHint: 'An open session cannot be moved or deleted; restart DSH and retry.',
+        moveUnavailableHint: 'Some selected sessions cannot be moved (cross-workspace, subagent descendants, or not ready).',
         archiveHint: 'Archiving moves the session from the active list to the archived list; restore it here.',
         moveArchivedHint: 'Moving does not change the archive state; the session stays archived.',
         working: 'Working…',
@@ -341,11 +355,19 @@ window.__ModuleLoader__.load({
 .dsm-note.warn{border-color:var(--dsw-alias-state-warn-primary)}
 .dsm-note-actions{display:flex;gap:6px;flex-wrap:wrap;flex:0 0 auto}
 .dsm-note detail{flex:1 1 100%}
+.dsm-sticky{position:sticky;top:0;z-index:3;display:flex;flex-direction:column;gap:8px;
+ padding:6px 0 8px;background:var(--dsw-alias-bg-base);border-bottom:1px solid var(--dsw-alias-border-l1)}
 .dsm-batch{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border-radius:7px;
- border:1px dashed var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);
- position:sticky;top:0;z-index:2;box-shadow:0 1px 0 var(--dsw-alias-border-l1)}
+ border:1px dashed var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1)}
+.dsm-list-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 2px}
 .dsm-group{border:1px solid var(--dsw-alias-border-l1);border-radius:8px;overflow:hidden;background:var(--dsw-alias-bg-layer-1)}
-.dsm-group-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;background:var(--dsw-alias-bg-layer-2)}
+.dsm-group-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;width:100%;
+ background:var(--dsw-alias-bg-layer-2);border:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.dsm-group-head:hover:not(:disabled){background:var(--dsw-alias-bg-layer-1)}
+.dsm-group-head:disabled{cursor:default;opacity:.85}
+.dsm-chev{flex:0 0 12px;font-size:10px;line-height:16px;color:var(--dsw-alias-label-secondary);text-align:center}
+.dsm-more{width:100%;justify-content:center;border-radius:0;border-left:none;border-right:none;
+ border-bottom:none;border-top:1px solid var(--dsw-alias-border-l1);min-height:30px}
 .dsm-group-title{font-size:12px;font-weight:600;line-height:18px}
 .dsm-group-path{font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary);word-break:break-all}
 .dsm-group-meta{margin-left:auto;font-size:11px;color:var(--dsw-alias-label-secondary);white-space:nowrap}
@@ -634,14 +656,23 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function Group({ group, selected, onToggle, onOpen, t }) {
+    function Group({ group, selected, onToggle, onSelect, onOpen, onMore, t, locked }) {
+      const remaining = group.rows.length - group.renderedRows.length
       return h(
         'section',
         { className: 'dsm-group' },
         h(
-          'header',
-          { className: 'dsm-group-head' },
-          h('div', { style: { minWidth: 0 } },
+          'button',
+          {
+            type: 'button',
+            className: 'dsm-group-head',
+            'aria-expanded': group.expanded === true ? 'true' : 'false',
+            disabled: locked === true,
+            title: locked === true ? t('searchAutoExpand') : undefined,
+            onClick: onToggle,
+          },
+          h('span', { className: 'dsm-chev', 'aria-hidden': 'true' }, group.expanded === true ? '▾' : '▸'),
+          h('div', { style: { minWidth: 0, flex: '1 1 auto' } },
             h('div', { className: 'dsm-group-title' }, group.title || t('workspaceUngrouped')),
             group.path ? h('div', { className: 'dsm-group-path' }, group.path) : null,
             group.status !== undefined && group.status !== 'ok'
@@ -650,16 +681,23 @@ window.__ModuleLoader__.load({
           ),
           h('div', { className: 'dsm-group-meta' }, t('groupLine', { n: group.rows.length, size: formatBytes(group.bytes) })),
         ),
-        group.rows.map((row) =>
+        group.renderedRows.map((row) =>
           h(Row, {
             key: row.id,
             row,
             selected: selected.has(row.id),
-            onToggle: () => onToggle(row.id),
+            onToggle: () => onSelect(row.id),
             onOpen: () => onOpen(row.id),
             t,
           }),
         ),
+        group.expanded === true && remaining > 0
+          ? h(
+              'button',
+              { type: 'button', className: 'dsm-btn ghost dsm-more', onClick: onMore },
+              t('loadMore', { n: remaining }),
+            )
+          : null,
       )
     }
 
@@ -1086,6 +1124,71 @@ window.__ModuleLoader__.load({
     // Page
     // ---------------------------------------------------------------------
 
+    /**
+     * Derive the filtered / grouped / rendered view for the list.
+     * Pure so the selection-pruning effect can use it before the loading guard.
+     */
+    function computeView({ state, tab, workspaceFilter, query, sort, expanded, defaultExpanded, limits }) {
+      const rows = state?.sessions ?? []
+      const workspaceOrder = state?.workspaces ?? []
+      const text = query.trim().toLowerCase()
+      const filtering = text !== ''
+      const filtered = rows.filter((row) => {
+        if (tab === 'active' && row.archived) return false
+        if (tab === 'archived' && !row.archived) return false
+        if (workspaceFilter === 'ungrouped' && row.workspaceId !== null) return false
+        if (workspaceFilter !== 'all' && workspaceFilter !== 'ungrouped' && row.workspaceId !== workspaceFilter) return false
+        if (filtering) {
+          const haystack = `${row.title}\n${row.cwd}\n${row.id}`.toLowerCase()
+          if (!haystack.includes(text)) return false
+        }
+        return true
+      })
+      const sorted = [...filtered].sort((left, right) => {
+        if (sort === 'created') return right.createdAt - left.createdAt
+        if (sort === 'size') return right.sizeBytes - left.sizeBytes
+        if (sort === 'title') return (left.title || left.cwd).localeCompare(right.title || right.cwd)
+        return right.updatedAt - left.updatedAt
+      })
+      const baseGroups = []
+      for (const workspace of workspaceOrder) {
+        const groupRows = sorted.filter((row) => row.workspaceId === workspace.id)
+        if (groupRows.length === 0) continue
+        baseGroups.push({
+          ...workspace,
+          rows: groupRows,
+          bytes: groupRows.reduce((sum, row) => sum + row.sizeBytes, 0),
+        })
+      }
+      const ungroupedRows = sorted.filter((row) => row.workspaceId === null)
+      if (ungroupedRows.length > 0) {
+        baseGroups.push({
+          id: 'ungrouped',
+          title: '',
+          path: '',
+          rows: ungroupedRows,
+          bytes: ungroupedRows.reduce((sum, row) => sum + row.sizeBytes, 0),
+        })
+      }
+      const groups = baseGroups.map((group) => {
+        const isExpanded = filtering ? true : (expanded === null ? defaultExpanded : expanded.has(group.id))
+        const limit = limits[group.id] ?? GROUP_PAGE_SIZE
+        return {
+          ...group,
+          expanded: isExpanded,
+          limit,
+          renderedRows: isExpanded ? group.rows.slice(0, limit) : [],
+        }
+      })
+      const visibleRows = groups.flatMap((group) => (group.expanded ? group.rows : []))
+      return {
+        filteredRows: sorted,
+        groups,
+        visibleRows,
+        visibleIdSet: new Set(visibleRows.map((row) => row.id)),
+      }
+    }
+
     function SessionManagerPage(props) {
       const { ctx, t } = props
       useLocaleTick(ctx)
@@ -1103,6 +1206,8 @@ window.__ModuleLoader__.load({
       const [notice, setNotice] = React.useState(null)
       const [bulkDeleteIds, setBulkDeleteIds] = React.useState(null)
       const [bulkTarget, setBulkTarget] = React.useState('')
+      const [expanded, setExpanded] = React.useState(null)
+      const [limits, setLimits] = React.useState({})
       const abortRef = React.useRef(null)
       const searchRef = React.useRef(null)
       const listScroll = React.useRef(0)
@@ -1175,6 +1280,37 @@ window.__ModuleLoader__.load({
         document.addEventListener('keydown', onKeyDown, true)
         return () => document.removeEventListener('keydown', onKeyDown, true)
       }, [selectedId])
+
+      React.useEffect(() => {
+        setLimits({})
+      }, [tab, workspaceFilter, query, includeSubagents])
+
+      const rows = state?.sessions ?? []
+      const defaultExpanded = (state?.totals?.all ?? 0) <= DEFAULT_COLLAPSE_AFTER
+      const view = React.useMemo(
+        () => computeView({ state, tab, workspaceFilter, query, sort, expanded, defaultExpanded, limits }),
+        [state, tab, workspaceFilter, query, sort, expanded, defaultExpanded, limits],
+      )
+      const viewKey = React.useMemo(
+        () => [
+          state?.generatedAt ?? 0,
+          tab,
+          workspaceFilter,
+          query,
+          includeSubagents ? 1 : 0,
+          defaultExpanded ? 1 : 0,
+          expanded === null ? 'auto' : [...expanded].sort().join(','),
+        ].join('|'),
+        [state?.generatedAt, tab, workspaceFilter, query, includeSubagents, defaultExpanded, expanded],
+      )
+      React.useEffect(() => {
+        setSelected((previous) => {
+          if (previous.size === 0) return previous
+          const next = new Set()
+          for (const id of previous) if (view.visibleIdSet.has(id)) next.add(id)
+          return next.size === previous.size ? previous : next
+        })
+      }, [viewKey])
 
       const run = async (operation, successText) => {
         setBusy(true)
@@ -1294,53 +1430,13 @@ window.__ModuleLoader__.load({
         return h('div', { className: 'dsm-page' }, h('p', { className: 'dsm-hint' }, h(Spinner, { t, label: t('loading') })))
       }
 
-      const rows = state?.sessions ?? []
-      const workspaceOrder = state?.workspaces ?? []
       const tabs = [
         { key: 'all', label: t('tabAll'), count: rows.length },
         { key: 'active', label: t('tabActive'), count: rows.filter((row) => !row.archived).length },
         { key: 'archived', label: t('tabArchived'), count: rows.filter((row) => row.archived).length },
       ]
-      const visible = rows.filter((row) => {
-        if (tab === 'active' && row.archived) return false
-        if (tab === 'archived' && !row.archived) return false
-        if (workspaceFilter === 'ungrouped' && row.workspaceId !== null) return false
-        if (workspaceFilter !== 'all' && workspaceFilter !== 'ungrouped' && row.workspaceId !== workspaceFilter) return false
-        const text = query.trim().toLowerCase()
-        if (text !== '') {
-          const haystack = `${row.title}\n${row.cwd}\n${row.id}`.toLowerCase()
-          if (!haystack.includes(text)) return false
-        }
-        return true
-      })
-      const sorted = [...visible].sort((left, right) => {
-        if (sort === 'created') return right.createdAt - left.createdAt
-        if (sort === 'size') return right.sizeBytes - left.sizeBytes
-        if (sort === 'title') return (left.title || left.cwd).localeCompare(right.title || right.cwd)
-        return right.updatedAt - left.updatedAt
-      })
-      const groups = []
-      for (const workspace of workspaceOrder) {
-        const groupRows = sorted.filter((row) => row.workspaceId === workspace.id)
-        if (groupRows.length === 0) continue
-        groups.push({
-          ...workspace,
-          rows: groupRows,
-          bytes: groupRows.reduce((sum, row) => sum + row.sizeBytes, 0),
-        })
-      }
-      const ungroupedRows = sorted.filter((row) => row.workspaceId === null)
-      if (ungroupedRows.length > 0) {
-        groups.push({
-          id: 'ungrouped',
-          title: t('workspaceUngrouped'),
-          path: '',
-          rows: ungroupedRows,
-          bytes: ungroupedRows.reduce((sum, row) => sum + row.sizeBytes, 0),
-        })
-      }
-      const visibleAllSelected = sorted.length > 0 && sorted.every((row) => selected.has(row.id))
-      const selectedRows = rows.filter((row) => selected.has(row.id))
+      const visibleAllSelected = view.visibleRows.length > 0 && view.visibleRows.every((row) => selected.has(row.id))
+      const selectedRows = view.visibleRows.filter((row) => selected.has(row.id))
       const overBatch = selectedRows.length > (state.limits?.maxBatch ?? 50)
       const overMove = selectedRows.length > (state.limits?.maxMoveBatch ?? 20)
       const selectedArchived = selectedRows.length > 0 && !overBatch && selectedRows.every((row) => row.archived)
@@ -1367,17 +1463,34 @@ window.__ModuleLoader__.load({
         if (visibleAllSelected) {
           setSelected((previous) => {
             const next = new Set(previous)
-            for (const row of sorted) next.delete(row.id)
+            for (const row of view.visibleRows) next.delete(row.id)
             return next
           })
         } else {
           setSelected((previous) => {
             const next = new Set(previous)
-            for (const row of sorted) next.add(row.id)
+            for (const row of view.visibleRows) next.add(row.id)
             return next
           })
         }
       }
+      const toggleGroup = (id) => {
+        setExpanded((previous) => {
+          const base = previous === null
+            ? new Set(view.groups.filter((group) => group.expanded).map((group) => group.id))
+            : new Set(previous)
+          const group = view.groups.find((item) => item.id === id)
+          if (group?.expanded === true) base.delete(id)
+          else base.add(id)
+          return base
+        })
+      }
+      const expandAll = () => setExpanded(new Set(view.groups.map((group) => group.id)))
+      const collapseAll = () => setExpanded(new Set())
+      const loadMore = (id) => {
+        setLimits((previous) => ({ ...previous, [id]: (previous[id] ?? GROUP_PAGE_SIZE) + GROUP_PAGE_SIZE }))
+      }
+      const isSearch = query.trim() !== ''
 
       if (selectedId !== null) {
         const row = state.sessions.find((item) => item.id === selectedId)
@@ -1445,6 +1558,7 @@ window.__ModuleLoader__.load({
               ),
             )
           : null,
+        h('div', { className: 'dsm-sticky' },
         h(
           'div',
           { className: 'dsm-toolbar' },
@@ -1501,7 +1615,7 @@ window.__ModuleLoader__.load({
             t('showSubagents'),
           ),
         ),
-        sorted.length > 0
+        view.visibleRows.length > 0
           ? h(
               'div',
               { className: 'dsm-batch' },
@@ -1512,6 +1626,7 @@ window.__ModuleLoader__.load({
               selectedRows.length > 0
                 ? h(React.Fragment, null,
                     h('span', { className: 'dsm-hint' }, t('selectedCount', { n: selectedRows.length })),
+                    h('span', { className: 'dsm-hint' }, t('selectionScopeHint')),
                     overBatch ? h('span', { className: 'dsm-warn' }, t('tooMany', { max: state.limits?.maxBatch ?? 50 })) : null,
                     overMove ? h('span', { className: 'dsm-warn' }, t('tooMany', { max: state.limits?.maxMoveBatch ?? 20 })) : null,
                     h('button', {
@@ -1558,12 +1673,29 @@ window.__ModuleLoader__.load({
                       onClick: () => setSelected(new Set()),
                     }, t('clearSelection')),
                     !selectedMovable && selectedRows.length > 0
-                      ? h('span', { className: 'dsm-hint' }, t('liveHint'))
+                      ? h('span', { className: 'dsm-hint' },
+                          selectedRows.some((row) => row.live || row.running) ? t('liveHint') : t('moveUnavailableHint'))
                       : null,
                   )
                 : null,
             )
           : null,
+        ),
+        h('div', { className: 'dsm-list-actions' },
+          h('button', {
+            type: 'button',
+            className: 'dsm-btn ghost',
+            disabled: busy || isSearch || view.groups.length === 0 || view.groups.every((group) => group.expanded),
+            onClick: expandAll,
+          }, t('expandAll')),
+          h('button', {
+            type: 'button',
+            className: 'dsm-btn ghost',
+            disabled: busy || isSearch || view.groups.length === 0 || view.groups.every((group) => !group.expanded),
+            onClick: collapseAll,
+          }, t('collapseAll')),
+          isSearch ? h('span', { className: 'dsm-hint' }, t('searchAutoExpand')) : null,
+        ),
         bulkDeleteIds !== null
           ? h(DeleteScope, {
               ctx,
@@ -1574,14 +1706,17 @@ window.__ModuleLoader__.load({
               onConfirmed: (ids) => void deleteRows(ids),
             })
           : null,
-        groups.length > 0
-          ? groups.map((group) =>
+        view.groups.length > 0
+          ? view.groups.map((group) =>
               h(Group, {
                 key: group.id,
                 group,
                 selected,
-                onToggle: toggle,
+                onToggle: () => toggleGroup(group.id),
+                onSelect: toggle,
                 onOpen: openDetail,
+                onMore: () => loadMore(group.id),
+                locked: isSearch,
                 t,
               }),
             )
