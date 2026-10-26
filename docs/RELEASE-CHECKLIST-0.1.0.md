@@ -50,11 +50,11 @@
 - [x] 仓库内没有真实会话 id、用户路径、token、Gmail 提交邮箱。
 - [x] 截图使用 `/Users/demo/...`、`session-demo-*` 假数据。
 - [x] 本地 `git init -b main` + commit `df3730a`（34 个文件，6406 行）；`private/` 已被忽略、未入库。
-- [ ] 公开仓库 `ZilongYang/dsh-session-mng` + topics（`dsh-plugin` / `deepseek-harness` / `dsh` / `session`）。
-- [ ] npm `dsh-session-mng@0.1.0` 发布并验证版本端点。
-- [ ] awesome-dsh-plugin `data/plugins/ZilongYang__dsh-session-mng.yml` PR。
+- [x] 公开仓库 `ZilongYang/dsh-session-mng` + topics（`dsh-plugin` / `deepseek-harness` / `dsh` / `session`）；tag `v0.1.0` 已推送。
+- [x] npm `dsh-session-mng@0.1.0` 发布并验证版本端点（200；28 files）。`npm publish` 返回 202，npm 先创建 `0.0.0-stage` 占位版本，数分钟后 `0.1.0` 公开可见。
+- [x] awesome-dsh-plugin PR：[#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672)（一个文件；CI pending）。
 - [ ] 市场 `plugins.json` / dshmarket 搜索可见。
-- [ ] GitHub tag `v0.1.0` 与 Release。
+- [x] GitHub tag `v0.1.0` 已推送；Release 可选（市场优先 npm）。
 
 ## F. 发版后回填
 

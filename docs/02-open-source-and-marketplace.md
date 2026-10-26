@@ -42,7 +42,11 @@ gh repo edit ZilongYang/dsh-session-mng \
   --add-topic dsh-plugin --add-topic deepseek-harness --add-topic dsh --add-topic session
 ```
 
-结果：待执行。
+结果（2026-10-27）：
+- 公开仓库：https://github.com/ZilongYang/dsh-session-mng
+- 首次 push：main，本地提交 `df3730a`（功能）+ `2f324e6`（文档）
+- tag：`v0.1.0` 已推送
+- topics：`dsh-plugin` / `deepseek-harness` / `dsh` / `session`
 
 ## 3. npm
 
@@ -60,7 +64,13 @@ curl -s https://registry.npmjs.org/dsh-session-mng/0.1.0 | head -c 300   # 以�
 - 发布后 packument 可能有约 10 分钟负缓存；以版本端点 / tarball 直链为准。
 - tarball 应包含 28 个文件：`index.js`、`lib/*`、`client.js`、`cordis.patch.yml`、`locale/*.json`、`icon.svg`、`screenshots.json`、`assets/*`、`README.md`、`CHANGELOG.md`、`ROADMAP.md`、`LICENSE`、`docs/*`；不含 `test/`。
 
-结果：待执行。
+结果（2026-10-27）：
+- `npm publish` 返回 `PUT 202 Accepted`，npm 先创建了公开占位版本 `0.0.0-stage`（`Temporary package placeholder for staged publishing`），数分钟后公开 packument 出现 `0.1.0`：
+  - `curl https://registry.npmjs.org/dsh-session-mng/0.1.0` → **200**
+  - `npm view dsh-session-mng version dist.fileCount` → `0.1.0`，`28`
+  - `dist.tarball` 直链 200；`npm pack dsh-session-mng@0.1.0` 可下载 28 个文件
+- 注意：`0.0.0-stage` 占位版本仍会出现在 packument 的 versions 列表里，`dist-tags.latest` 是 `0.1.0`；安装时默认取 latest，不受影响。不要把它当作真实版本。
+- 该账号的 token 不能读 `npm profile` / `npm access`（E403），但 publish 可用；后续如需 `npm stage` 子命令，需要 npm CLI ≥11.15.0（当前 11.9.0 没有 `stage`）。
 
 ## 4. awesome-dsh-plugin / dshmarket
 
@@ -84,7 +94,11 @@ PR 描述建议包含：
 
 时间：仓库创建满 24h 后再提 PR（或先提，CI 自动重跑变绿）。
 
-结果：待执行。
+结果（2026-10-27）：
+- PR：https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672
+- 只新增一个文件：`data/plugins/ZilongYang__dsh-session-mng.yml`
+- CI 首次运行 pending；仓库创建于当天，1 天年龄门槛可能先红，workflow 会自动重跑。
+- PR 描述包含：npm 链接、分类、`dsh.bundle`、截图/图标、与现有条目的差异、实测版本与测试。
 
 ## 5. 市场验证
 
