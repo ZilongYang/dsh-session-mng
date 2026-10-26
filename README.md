@@ -50,6 +50,8 @@ dsh plugin --profile <profile> add link:/绝对路径/dsh-session-mng
 
 Host 半是进程内模块：装完如果看不到页面，重启一次 dsh/应用再刷新页面；Client 半刷新页面即可。
 
+> 市场状态：已向 awesome-dsh-plugin 提交收录 PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672)（审核中；dshmarket 使用同一份目录，合并后可直接在插件市场搜索到）。
+
 ## 使用
 
 1. 打开 **设置 → 会话管理**。
