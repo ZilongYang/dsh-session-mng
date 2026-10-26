@@ -49,7 +49,8 @@
 - [x] `.gitignore` 忽略 `private/`、`.npm-cache/`、`node_modules/`、`.DS_Store`。
 - [x] 仓库内没有真实会话 id、用户路径、token、Gmail 提交邮箱。
 - [x] 截图使用 `/Users/demo/...`、`session-demo-*` 假数据。
-- [ ] `git init`、提交历史、公开仓库、topics（`dsh-plugin` / `deepseek-harness` / `dsh` / `session`）。
+- [x] 本地 `git init -b main` + commit `df3730a`（34 个文件，6406 行）；`private/` 已被忽略、未入库。
+- [ ] 公开仓库 `ZilongYang/dsh-session-mng` + topics（`dsh-plugin` / `deepseek-harness` / `dsh` / `session`）。
 - [ ] npm `dsh-session-mng@0.1.0` 发布并验证版本端点。
 - [ ] awesome-dsh-plugin `data/plugins/ZilongYang__dsh-session-mng.yml` PR。
 - [ ] 市场 `plugins.json` / dshmarket 搜索可见。
