@@ -45,7 +45,7 @@ gh repo edit ZilongYang/dsh-session-mng \
 结果（2026-10-27）：
 - 公开仓库：https://github.com/ZilongYang/dsh-session-mng
 - 首次 push：main，本地提交 `df3730a`（功能）+ `2f324e6`（文档）
-- tag：`v0.1.0` 已推送
+- tag：`v0.1.0` 已推送；GitHub Release：https://github.com/ZilongYang/dsh-session-mng/releases/tag/v0.1.0
 - topics：`dsh-plugin` / `deepseek-harness` / `dsh` / `session`
 
 ## 3. npm
@@ -97,7 +97,8 @@ PR 描述建议包含：
 结果（2026-10-27）：
 - PR：https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672
 - 只新增一个文件：`data/plugins/ZilongYang__dsh-session-mng.yml`
-- CI 首次运行 pending；仓库创建于当天，1 天年龄门槛可能先红，workflow 会自动重跑。
+- CI 首次运行：entry 格式 / README 一致性 / awesome-lint / 回归测试已通过，site build 进行中；仓库创建于当天，1 天年龄门槛可能先红，workflow 会自动重跑。
+- 已验证 `assets/icon-180.png` 与三张截图的 raw.githubusercontent.com 直链返回 200。
 - PR 描述包含：npm 链接、分类、`dsh.bundle`、截图/图标、与现有条目的差异、实测版本与测试。
 
 ## 5. 市场验证
