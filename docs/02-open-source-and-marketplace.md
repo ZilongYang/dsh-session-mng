@@ -128,3 +128,7 @@ curl -s https://awesome-dsh-plugin.com/plugins.json | grep -i session-mng
 - Git：main 已 push；tag `v0.1.1`；GitHub Release 见仓库 Releases。
 - marketplace：PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 不变；`check` 已通过，`Submission gate` 仅因仓库 0.0 天（需要 1 天）失败；该检查会自动重跑，约 24h 后转绿，不需要重新提交。
 - Release：https://github.com/ZilongYang/dsh-session-mng/releases/tag/v0.1.1
+
+## 8. 接手
+
+下一步市场验证与 0.2.0 任务见 [HANDOVER-2026-10-27.md](HANDOVER-2026-10-27.md)。

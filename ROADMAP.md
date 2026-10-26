@@ -1,5 +1,7 @@
 # Roadmap
 
+> 当前：`0.1.1` 已发布（npm latest / tag `v0.1.1` / Release）。市场 PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 的 `check` 已过，只差仓库 1 天年龄 gate（约 2026-10-28 00:44 Asia/Shanghai 自动重跑）。下一项主任务是 0.2.0 的 Host 分页；详细接手任务见 [docs/HANDOVER-2026-10-27.md](docs/HANDOVER-2026-10-27.md)。
+
 ## 0.1.0 — delivered
 
 - 统一会话总览（活跃 + 已归档，工作区分组，搜索/筛选/排序，日志大小）。
@@ -17,10 +19,20 @@
 - 选择集裁剪到当前筛选与展开可见集；批量操作不触碰隐藏会话。
 - 批量移动提示区分 live 与一般不可移动项。
 
-## 0.2.0 — candidates
+## 0.2.0 — next (planned)
 
-- Host 侧 overview + paged sessions 接口：首屏只取工作区计数，按工作区懒加载 50 条，真正支撑 1000–10000 条会话。
-- 未分组会话懒加载 + 短缓存；全局搜索复用宿主索引。
+首要目标：真正支撑 1000–10000 条会话，不再首屏拉全量 `state`。实施前先写 `docs/PLAN-2026-10-28.md` 并获批准。
+
+- `GET /session-mng/api/overview`：只返回工作区计数/大小/归档数、totals、capabilities、orphans；不读全部标题/日志。
+- `GET /session-mng/api/sessions`：按 `workspaceId/tab/offset/limit/query/sort` 分页；只对当前页 id 读标题/大小；返回 `hasMore`。
+- 未分组会话懒加载 + 短 TTL 缓存；全局搜索先只读验证宿主 search 是否覆盖标题。
+- Client：overview 首屏 → 工作区展开时取第一页 → 加载更多；保留 sticky、选择裁剪、搜索自动展开。
+- 兼容：保留 `/state` 给 0.1.x 客户端；Host 同时提供新旧接口。
+- 验收：合成 10k 数据首屏不返回 session rows；单页 ≤50 行；不触发全量 `sessionController.list`；现有 26 测试 + 新增分页/overview/search 测试。
+- 详细接口建议、验收与坑：[docs/HANDOVER-2026-10-27.md](docs/HANDOVER-2026-10-27.md)。
+
+## Later candidates
+
 - 侧栏会话「...」菜单快捷入口（生成标题 / 会话管理详情），复用同一套 Host 操作。
 - 内容全文搜索（复用 `sessionQuery.searchSessions` / `searchEvents`），不只按标题/路径/id。
 - 导出所选会话为 Markdown / JSON（删除前的安全网；批量）。

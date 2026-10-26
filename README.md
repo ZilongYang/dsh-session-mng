@@ -54,7 +54,7 @@ dsh plugin --profile <profile> add link:/绝对路径/dsh-session-mng
 
 Host 半是进程内模块：装完如果看不到页面，重启一次 dsh/应用再刷新页面；Client 半刷新页面即可。
 
-> 市场状态：已向 awesome-dsh-plugin 提交收录 PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672)（审核中；dshmarket 使用同一份目录，合并后可直接在插件市场搜索到）。
+> 市场状态：awesome-dsh-plugin 收录 PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 的 `check` 已通过；`Submission gate` 目前只差仓库满 1 天（约 2026-10-28 00:44 Asia/Shanghai 自动重跑），无需重新提交。合并后 dshmarket 读取同一份目录，卡片版本随 npm 显示 `0.1.1`。
 
 ## 使用
 
@@ -94,6 +94,7 @@ Host route (lib/api.js) ──► service (lib/service.js)
 | 会话后端 | 移动/删除只支持本地 JSONL 后端（`sessionPersistence.locate`）；其他后端仍可用总览/标题/归档/恢复 |
 | 官方依赖 | 无 runtime 依赖；只使用 `ctx` 服务 |
 | 已知限制 | 已打开（live）会话不能移动或彻底删除，重启 DSH 后重试；有子代理后代的会话不能单独移动；子会话不出现在主列表（可勾选「显示子会话」查看） |
+| 规模限制 | 0.1.1 的折叠/分页只在客户端压 DOM，`state` 仍一次拉全量（202 条约 103 KB；10000 条约 5 MB）。Host 侧 overview + paged sessions 是 0.2.0 的主任务 |
 
 ### 版本敏感点（请读）
 
@@ -136,10 +137,17 @@ node --check index.js client.js lib/*.js
 npm --cache /tmp/dsh-npm-cache pack --dry-run
 ```
 
-实机验收（详见 `docs/RELEASE-CHECKLIST-0.1.0.md`）：安装到 `desktop` profile → 确认 `settings.section` 出现 `session-mng-section` → 用**一次性测试会话**验证标题/归档/恢复/移动/删除 → 清理测试数据。
+实机验收：安装到 `desktop` profile → 确认 `settings.section` 出现 `session-mng-section` → 用**一次性测试会话**验证标题/归档/恢复/移动/删除 → 清理测试数据。0.1.1 的列表验收见 `docs/RELEASE-CHECKLIST-0.1.1.md`。
+
+## 当前状态与下一步
+
+- `0.1.1` 已发布到 npm / GitHub / Release；26 个测试全绿，31 个文件。
+- 市场 PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 等 1 天仓库年龄 gate，之后等维护者合并。
+- 下一项主任务：**0.2.0 Host 侧 overview + 分页 sessions**，为 1000–10000 条会话设计；详细任务、验收标准、环境坑见 [接手说明](docs/HANDOVER-2026-10-27.md)。
 
 ## 文档索引
 
+- [接手说明（下一步任务）](docs/HANDOVER-2026-10-27.md)
 - [实施计划（批准时原样归档）](docs/PLAN-2026-10-26.md)
 - [0.1.0 发布检查清单](docs/RELEASE-CHECKLIST-0.1.0.md)
 - [0.1.1 实施计划](docs/PLAN-2026-10-27.md)

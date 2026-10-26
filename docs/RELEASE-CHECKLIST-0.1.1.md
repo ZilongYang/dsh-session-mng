@@ -37,6 +37,19 @@
 
 - [x] `npm --cache /tmp/dsh-npm-cache pack --dry-run`：31 个文件 / 560.8 kB；npm 发布实际 tarball 560.7 kB / unpacked 767.4 kB；包含 4 张截图。
 - [x] `npm publish` 0.1.1（`+ dsh-session-mng@0.1.1`）；版本端点 HTTP 200，`latest` = 0.1.1，`dist.fileCount` = 31。发布后约 90 秒 packument 才出现 0.1.1（与 0.1.0 相同的 staged 处理）。
-- [x] Git commit `cea99f9` + push main + tag `v0.1.1` + GitHub Release（见发布记录）。
+- [x] Git commit `cea99f9` + push main + tag `v0.1.1` + GitHub Release（https://github.com/ZilongYang/dsh-session-mng/releases/tag/v0.1.1）。
 - [x] 确认 npm `latest` = 0.1.1；marketplace 条目无需改 YAML，市场卡片版本随 npm 自动更新。
 - [x] 在 `docs/02-open-source-and-marketplace.md` 记录 0.1.1 发布结果。
+
+## E. 市场收录（进行中）
+
+- [x] PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 已提交，只新增 1 个 YAML；条目不需要随 0.1.1 改。
+- [x] `check` 已通过。
+- [ ] `Submission gate`：当前仅因仓库 0.0 天（需要 1 天）失败；约 2026-10-28 00:44 Asia/Shanghai 自动重跑，不要重新提交/关闭重开。
+- [ ] gate 转绿后等待维护者合并。
+- [ ] 合并后验证 `plugins.json` / dshmarket 搜索、卡片版本 `0.1.1`、4 张截图、icon。
+- [ ] 结果回填 `docs/02-open-source-and-marketplace.md` 与本节。
+
+## F. 接手
+
+完整接手说明、0.2.0 任务、环境坑见 [HANDOVER-2026-10-27.md](HANDOVER-2026-10-27.md)。
