@@ -1,5 +1,9 @@
 # dsh-session-mng
 
+[![npm package](https://img.shields.io/npm/v/dsh-session-mng.svg?label=npm)](https://www.npmjs.com/package/dsh-session-mng)
+[![DSH Web Plugin](https://img.shields.io/badge/DSH%20Web-Plugin-0f766e.svg)](https://github.com/deepseek-ai/deepseek-harness)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **One Settings page for every DeepSeek Harness session — generate a title from the whole conversation, archive or restore, move a cold session to another workspace, and permanently delete archived sessions.**
 
 一个设置页管理全部 DSH 会话：按整段对话生成标题、归档/恢复、跨工作区移动、彻底删除已归档会话。Host + Web Client 双半插件，无运行时依赖，不注册模型可见工具，不注册标题 provider。
