@@ -24,7 +24,7 @@
 
 ## C. 发布（待批准）
 
-- [ ] `npm pack --dry-run` 确认文件数。
+- [x] `npm pack --dry-run`：33 个文件 / 568.2 kB（比 0.1.1 多 2 个 docs）。
 - [ ] `npm publish` 0.1.2；验证版本端点与 latest。
 - [ ] Git commit / push / tag `v0.1.2` / GitHub Release。
 - [ ] 市场条目不需要改 YAML；版本随 npm 自动更新。
