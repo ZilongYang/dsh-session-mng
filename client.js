@@ -44,6 +44,11 @@ window.__ModuleLoader__.load({
         sortSize: '大小',
         sortTitle: '标题',
         showSubagents: '显示子会话',
+        showBlank: '显示空会话',
+        cleanupBlank: '清理空会话（{n}）',
+        cleanupBlankHint: '批量删除已归档的空会话；未归档的空会话需先归档。',
+        blankActiveHint: '另有 {n} 个未归档空会话，归档后才能清理。',
+        hiddenBlankCount: '已隐藏 {n} 个空会话',
         selectAll: '全选当前列表',
         expandAll: '展开全部',
         collapseAll: '收起全部',
@@ -192,6 +197,11 @@ window.__ModuleLoader__.load({
         sortSize: 'Size',
         sortTitle: 'Title',
         showSubagents: 'Show subagent sessions',
+        showBlank: 'Show empty sessions',
+        cleanupBlank: 'Clean up empty sessions ({n})',
+        cleanupBlankHint: 'Permanently delete archived empty sessions; unarchived empty sessions must be archived first.',
+        blankActiveHint: '{n} unarchived empty sessions must be archived before cleanup.',
+        hiddenBlankCount: '{n} empty sessions hidden',
         selectAll: 'Select all shown',
         expandAll: 'Expand all',
         collapseAll: 'Collapse all',
@@ -430,6 +440,22 @@ window.__ModuleLoader__.load({
 .dsm-scope-row .dsm-mono{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dsm-danger-box{border:1px solid var(--dsw-alias-state-error-primary);border-radius:8px;padding:10px;background:var(--dsw-alias-bg-layer-1)}
 .dsm-danger-box h3{color:var(--dsw-alias-state-error-primary)}
+.dsm-scope-overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;
+ padding:20px;background:rgba(0,0,0,.58)}
+.dsm-scope-dialog{display:flex;flex-direction:column;width:min(660px,100%);max-height:min(82vh,760px);
+ border:1px solid var(--dsw-alias-state-error-primary);border-radius:10px;overflow:hidden;
+ background:var(--dsw-alias-bg-layer-2);box-shadow:0 24px 70px rgba(0,0,0,.5)}
+.dsm-scope-head{display:flex;align-items:center;justify-content:space-between;gap:10px;
+ padding:11px 14px;border-bottom:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1)}
+.dsm-scope-head h3{margin:0;font-size:13px;line-height:18px;color:var(--dsw-alias-state-error-primary)}
+.dsm-scope-body{flex:1 1 auto;min-height:0;overflow:auto;padding:12px 14px}
+.dsm-scope-foot{display:flex;flex-direction:column;gap:8px;padding:10px 14px;
+ border-top:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1)}
+.dsm-scope-dialog .dsm-scope-list{max-height:none;overflow:visible;margin:8px 0}
+@media (max-width:640px){
+ .dsm-scope-overlay{padding:10px}
+ .dsm-scope-dialog{max-height:92vh}
+}
 .dsm-footer{font-size:11px;line-height:17px;color:var(--dsw-alias-label-secondary)}
 .dsm-spin{display:inline-block;width:12px;height:12px;border:2px solid var(--dsw-alias-border-l2);
  border-top-color:var(--dsw-alias-brand-primary);border-radius:50%;animation:dsm-spin .8s linear infinite;vertical-align:-2px}
@@ -919,6 +945,7 @@ window.__ModuleLoader__.load({
       React.useEffect(() => {
         const controller = new AbortController()
         setPhase('loading')
+        setChecked(false)
         post('delete/preview', { sessionIds: ids }, controller.signal)
           .then((value) => {
             if (controller.signal.aborted) return
@@ -933,43 +960,86 @@ window.__ModuleLoader__.load({
         return () => controller.abort()
       }, [idsKey, t])
 
+      React.useEffect(() => {
+        const onKeyDown = (event) => {
+          if (event.key !== 'Escape') return
+          event.preventDefault()
+          event.stopPropagation()
+          if (busy !== true) onCancel()
+        }
+        document.addEventListener('keydown', onKeyDown, true)
+        return () => document.removeEventListener('keydown', onKeyDown, true)
+      }, [busy, onCancel])
+
       const rows = preview?.sessions ?? []
       const blocked = rows.some((row) => row.live || row.running)
+      const ready = phase === 'ready' && preview !== null
       return h(
         'div',
-        { className: 'dsm-danger-box' },
-        h('h3', null, t('deleteScope')),
-        h('p', { className: 'dsm-hint', style: { margin: '0 0 6px' } }, t('deleteHint')),
-        phase === 'loading'
-          ? h('p', { className: 'dsm-hint' }, t('deletePreviewLoading'))
-          : phase === 'error'
-            ? h('p', { className: 'dsm-error' }, error)
-            : h(
-                React.Fragment,
-                null,
-                h('div', { className: 'dsm-hint' },
-                  `${t('deleteRoots')}: ${preview?.roots?.length ?? 0} · ${t('deleteDescendants')}: ${preview?.descendantCount ?? 0} · ${t('deleteTotalSize', { size: formatBytes(preview?.totalBytes ?? 0) })}`,
-                ),
-                h('div', { className: 'dsm-scope-list' },
-                  rows.map((row) =>
-                    h(
-                      'div',
-                      { key: row.id, className: 'dsm-scope-row' },
-                      h('span', { className: 'dsm-badge' }, row.descendant ? t('scopeChild') : t('scopeRoot')),
-                      h('span', { className: 'dsm-mono', title: row.dir ?? row.id }, row.id),
-                      row.live ? h(Badge, { tone: 'brand' }, t('liveBadge')) : null,
-                      row.running ? h(Badge, { tone: 'run' }, t('running')) : null,
-                      row.missing ? h(Badge, { tone: 'warn' }, t('missingDir')) : null,
-                      row.readable === false ? h(Badge, { tone: 'warn' }, t('unreadable')) : null,
-                      h('span', { style: { marginLeft: 'auto' } }, formatBytes(row.bytes)),
+        {
+          className: 'dsm-scope-overlay',
+          onMouseDown: (event) => {
+            if (event.target === event.currentTarget && busy !== true) onCancel()
+          },
+        },
+        h(
+          'div',
+          {
+            className: 'dsm-scope-dialog',
+            role: 'dialog',
+            'aria-modal': 'true',
+            'aria-label': t('deleteScope'),
+          },
+          h(
+            'div',
+            { className: 'dsm-scope-head' },
+            h('h3', null, t('deleteScope')),
+            h('button', {
+              type: 'button',
+              className: 'dsm-btn ghost',
+              'aria-label': t('close'),
+              disabled: busy,
+              onClick: onCancel,
+            }, '×'),
+          ),
+          h(
+            'div',
+            { className: 'dsm-scope-body' },
+            h('p', { className: 'dsm-hint', style: { margin: '0 0 8px' } }, t('deleteHint')),
+            phase === 'loading'
+              ? h('p', { className: 'dsm-hint' }, t('deletePreviewLoading'))
+              : phase === 'error'
+                ? h('p', { className: 'dsm-error' }, error)
+                : h(
+                    React.Fragment,
+                    null,
+                    h('div', { className: 'dsm-hint' },
+                      `${t('deleteRoots')}: ${preview?.roots?.length ?? 0} · ${t('deleteDescendants')}: ${preview?.descendantCount ?? 0} · ${t('deleteTotalSize', { size: formatBytes(preview?.totalBytes ?? 0) })}`,
                     ),
+                    h('div', { className: 'dsm-scope-list' },
+                      rows.map((row) =>
+                        h(
+                          'div',
+                          { key: row.id, className: 'dsm-scope-row' },
+                          h('span', { className: 'dsm-badge' }, row.descendant ? t('scopeChild') : t('scopeRoot')),
+                          h('span', { className: 'dsm-mono', title: row.dir ?? row.id }, row.id),
+                          row.live ? h(Badge, { tone: 'brand' }, t('liveBadge')) : null,
+                          row.running ? h(Badge, { tone: 'run' }, t('running')) : null,
+                          row.missing ? h(Badge, { tone: 'warn' }, t('missingDir')) : null,
+                          row.readable === false ? h(Badge, { tone: 'warn' }, t('unreadable')) : null,
+                          h('span', { style: { marginLeft: 'auto' } }, formatBytes(row.bytes)),
+                        ),
+                      ),
+                    ),
+                    h('p', { className: 'dsm-hint', style: { margin: '0 0 6px' } }, t('deleteCascadeNote')),
+                    blocked ? h('p', { className: 'dsm-error' }, t('deleteLiveHint')) : null,
                   ),
-                ),
-                h('p', { className: 'dsm-hint', style: { margin: '0 0 6px' } }, t('deleteCascadeNote')),
-                blocked
-                  ? h('p', { className: 'dsm-error' }, t('deleteLiveHint'))
-                  : null,
-                h('label', { className: 'dsm-check', style: { marginBottom: 8 } },
+          ),
+          h(
+            'div',
+            { className: 'dsm-scope-foot' },
+            ready
+              ? h('label', { className: 'dsm-check' },
                   h('input', {
                     type: 'checkbox',
                     checked,
@@ -977,20 +1047,22 @@ window.__ModuleLoader__.load({
                     onChange: (event) => setChecked(event.target.checked),
                   }),
                   t('deleteConfirmCheck'),
-                ),
-                h(
-                  'div',
-                  { className: 'dsm-actions' },
-                  h('button', {
-                    type: 'button',
-                    className: 'dsm-btn danger',
-                    disabled: busy || blocked || checked !== true,
-                    onClick: () => onConfirmed(ids),
-                  }, busy ? t('deleting') : t('deleteConfirm')),
-                  h('button', { type: 'button', className: 'dsm-btn ghost', disabled: busy, onClick: onCancel }, t('cancel')),
-                  blocked ? h('span', { className: 'dsm-hint' }, t('liveHint')) : null,
-                ),
-              ),
+                )
+              : null,
+            h(
+              'div',
+              { className: 'dsm-actions' },
+              h('button', {
+                type: 'button',
+                className: 'dsm-btn danger',
+                disabled: busy || ready !== true || blocked || checked !== true,
+                onClick: () => onConfirmed(ids),
+              }, busy ? t('deleting') : t('deleteConfirm')),
+              h('button', { type: 'button', className: 'dsm-btn ghost', disabled: busy, onClick: onCancel }, t('cancel')),
+              blocked ? h('span', { className: 'dsm-hint' }, t('liveHint')) : null,
+            ),
+          ),
+        ),
       )
     }
 
@@ -1153,7 +1225,7 @@ window.__ModuleLoader__.load({
      * Derive the filtered / grouped / rendered view for the list.
      * Pure so the selection-pruning effect can use it before the loading guard.
      */
-    function computeView({ state, tab, workspaceFilter, query, sort, expanded, defaultExpanded, limits }) {
+    function computeView({ state, tab, workspaceFilter, query, sort, expanded, defaultExpanded, limits, showBlank }) {
       const rows = state?.sessions ?? []
       const workspaceOrder = state?.workspaces ?? []
       const text = query.trim().toLowerCase()
@@ -1163,6 +1235,7 @@ window.__ModuleLoader__.load({
         if (tab === 'archived' && !row.archived) return false
         if (workspaceFilter === 'ungrouped' && row.workspaceId !== null) return false
         if (workspaceFilter !== 'all' && workspaceFilter !== 'ungrouped' && row.workspaceId !== workspaceFilter) return false
+        if (showBlank !== true && row.blank === true) return false
         if (filtering) {
           const haystack = `${row.title}\n${row.cwd}\n${row.id}`.toLowerCase()
           if (!haystack.includes(text)) return false
@@ -1233,6 +1306,7 @@ window.__ModuleLoader__.load({
       const [bulkTarget, setBulkTarget] = React.useState('')
       const [expanded, setExpanded] = React.useState(null)
       const [limits, setLimits] = React.useState({})
+      const [showBlank, setShowBlank] = React.useState(false)
       const abortRef = React.useRef(null)
       const searchRef = React.useRef(null)
       const listScroll = React.useRef(0)
@@ -1298,6 +1372,7 @@ window.__ModuleLoader__.load({
         if (selectedId === null) return undefined
         const onKeyDown = (event) => {
           if (event.key === 'Escape') {
+            if (document.querySelector('.dsm-scope-overlay') !== null) return
             event.stopPropagation()
             backToList()
           }
@@ -1308,13 +1383,13 @@ window.__ModuleLoader__.load({
 
       React.useEffect(() => {
         setLimits({})
-      }, [tab, workspaceFilter, query, includeSubagents])
+      }, [tab, workspaceFilter, query, includeSubagents, showBlank])
 
       const rows = state?.sessions ?? []
       const defaultExpanded = (state?.totals?.all ?? 0) <= DEFAULT_COLLAPSE_AFTER
       const view = React.useMemo(
-        () => computeView({ state, tab, workspaceFilter, query, sort, expanded, defaultExpanded, limits }),
-        [state, tab, workspaceFilter, query, sort, expanded, defaultExpanded, limits],
+        () => computeView({ state, tab, workspaceFilter, query, sort, expanded, defaultExpanded, limits, showBlank }),
+        [state, tab, workspaceFilter, query, sort, expanded, defaultExpanded, limits, showBlank],
       )
       const viewKey = React.useMemo(
         () => [
@@ -1323,10 +1398,11 @@ window.__ModuleLoader__.load({
           workspaceFilter,
           query,
           includeSubagents ? 1 : 0,
+          showBlank ? 1 : 0,
           defaultExpanded ? 1 : 0,
           expanded === null ? 'auto' : [...expanded].sort().join(','),
         ].join('|'),
-        [state?.generatedAt, tab, workspaceFilter, query, includeSubagents, defaultExpanded, expanded],
+        [state?.generatedAt, tab, workspaceFilter, query, includeSubagents, showBlank, defaultExpanded, expanded],
       )
       React.useEffect(() => {
         setSelected((previous) => {
@@ -1455,10 +1531,14 @@ window.__ModuleLoader__.load({
         return h('div', { className: 'dsm-page' }, h('p', { className: 'dsm-hint' }, h(Spinner, { t, label: t('loading') })))
       }
 
+      const rowsForTabs = rows.filter((row) => showBlank || row.blank !== true)
+      const blankRows = rows.filter((row) => row.blank === true)
+      const blankArchivedRows = blankRows.filter((row) => row.archived === true && row.can?.delete === true)
+      const blankActiveCount = blankRows.filter((row) => row.archived !== true || row.can?.delete !== true).length
       const tabs = [
-        { key: 'all', label: t('tabAll'), count: rows.length },
-        { key: 'active', label: t('tabActive'), count: rows.filter((row) => !row.archived).length },
-        { key: 'archived', label: t('tabArchived'), count: rows.filter((row) => row.archived).length },
+        { key: 'all', label: t('tabAll'), count: rowsForTabs.length },
+        { key: 'active', label: t('tabActive'), count: rowsForTabs.filter((row) => !row.archived).length },
+        { key: 'archived', label: t('tabArchived'), count: rowsForTabs.filter((row) => row.archived).length },
       ]
       const visibleAllSelected = view.visibleRows.length > 0 && view.visibleRows.every((row) => selected.has(row.id))
       const selectedRows = view.visibleRows.filter((row) => selected.has(row.id))
@@ -1564,9 +1644,24 @@ window.__ModuleLoader__.load({
                 archived: state.totals.archived,
                 size: formatBytes(state.totals.bytes),
               }),
+              blankRows.length > 0 && !showBlank
+                ? ` · ${t('hiddenBlankCount', { n: blankRows.length })}`
+                : '',
             ),
+            blankActiveCount > 0 && showBlank
+              ? h('p', { className: 'dsm-hint' }, t('blankActiveHint', { n: blankActiveCount }))
+              : null,
           ),
           h('div', { className: 'dsm-head-actions' },
+            blankArchivedRows.length > 0
+              ? h('button', {
+                  type: 'button',
+                  className: 'dsm-btn',
+                  disabled: busy,
+                  title: `${t('cleanupBlankHint')}${blankActiveCount > 0 ? ` ${t('blankActiveHint', { n: blankActiveCount })}` : ''}`,
+                  onClick: () => setBulkDeleteIds(blankArchivedRows.map((row) => row.id)),
+                }, t('cleanupBlank', { n: blankArchivedRows.length }))
+              : null,
             h('button', { type: 'button', className: 'dsm-btn', disabled: busy, onClick: () => void load({ silent: true }) },
               busy ? h(Spinner, { t, label: t('working') }) : t('refresh')),
           ),
@@ -1638,6 +1733,14 @@ window.__ModuleLoader__.load({
               onChange: (event) => setIncludeSubagents(event.target.checked),
             }),
             t('showSubagents'),
+          ),
+          h('label', { className: 'dsm-check' },
+            h('input', {
+              type: 'checkbox',
+              checked: showBlank,
+              onChange: (event) => setShowBlank(event.target.checked),
+            }),
+            t('showBlank'),
           ),
         ),
         view.visibleRows.length > 0
