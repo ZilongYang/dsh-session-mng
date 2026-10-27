@@ -132,3 +132,10 @@ curl -s https://awesome-dsh-plugin.com/plugins.json | grep -i session-mng
 ## 8. 接手
 
 下一步市场验证与 0.2.0 任务见 [HANDOVER-2026-10-27.md](HANDOVER-2026-10-27.md)。
+
+## 9. 0.1.2 更新发布（2026-10-27）
+
+- 客户端修复：空会话默认隐藏 + 清理已归档空会话 + 删除范围模态确认。
+- `npm publish`：`dsh-session-mng@0.1.2`，33 个文件，568.3 kB / unpacked 789.1 kB；约 3 分钟后 packument 出现，`latest` = 0.1.2，版本端点 200。
+- Git：main 已 push；tag `v0.1.2`；Release 见仓库 Releases。
+- marketplace 条目不变；卡片版本随 npm 自动更新，PR gate 仍只差仓库满 1 天。

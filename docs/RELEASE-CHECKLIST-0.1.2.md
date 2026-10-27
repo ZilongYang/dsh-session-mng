@@ -19,13 +19,13 @@
   - 默认只渲染 2 条非空会话；tab 全部/活跃/已归档 = 2/2/0；`清理空会话` 按钮存在。
   - 打开清理 → `.dsm-scope-overlay` / `.dsm-scope-dialog` / `.dsm-scope-foot` 存在；确认按钮 disabled；取消后弹窗消失。
   - 勾选「显示空会话」→ 行数 4；再取消。
-- [ ] 子龙实机测试：默认隐藏、显示空会话、清理空会话（**不要确认删除真实空会话**，除非明确要清）、删除范围弹窗滚动时底部按钮可见。
+- [x] 子龙实机测试通过：默认隐藏、显示空会话、清理空会话、删除范围弹窗滚动时底部按钮可见。
 - [ ] 若确认文案/按钮位置需要微调，再改一轮。
 
 ## C. 发布（待批准）
 
-- [x] `npm pack --dry-run`：33 个文件 / 568.2 kB（比 0.1.1 多 2 个 docs）。
-- [ ] `npm publish` 0.1.2；验证版本端点与 latest。
-- [ ] Git commit / push / tag `v0.1.2` / GitHub Release。
-- [ ] 市场条目不需要改 YAML；版本随 npm 自动更新。
-- [ ] 更新 `CHANGELOG` 的 unreleased 标记、README 当前状态、ROADMAP、`docs/HANDOVER-2026-10-27.md`。
+- [x] `npm pack`：33 个文件 / 568.3 kB，unpacked 789.1 kB。
+- [x] `npm publish` 0.1.2；版本端点 HTTP 200，`latest` = 0.1.2，`dist.fileCount` = 33（发布后约 3 分钟公开）。
+- [x] Git commit / push / tag `v0.1.2` / GitHub Release（见仓库 Releases）。
+- [x] 市场条目不需要改 YAML；版本随 npm 自动更新。
+- [x] 更新 `CHANGELOG` 的 unreleased 标记、README 当前状态、ROADMAP、`docs/HANDOVER-2026-10-27.md`。

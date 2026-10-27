@@ -143,8 +143,8 @@ npm --cache /tmp/dsh-npm-cache pack --dry-run
 
 ## 当前状态与下一步
 
-- `0.1.1` 已发布到 npm / GitHub / Release；26 个测试全绿，31 个文件。
-- `0.1.2`（空会话清理 + 删除范围弹窗）已在工作区实现，待实机测试/发布。
+- `0.1.2` 已发布到 npm / GitHub / Release；空会话默认隐藏、清理空会话、删除范围模态确认。
+- `0.1.1` 已发布；26 个测试全绿，0.1.2 包 33 个文件 / 568.3 kB。
 - 市场 PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 等 1 天仓库年龄 gate，之后等维护者合并。
 - 下一项主任务：**0.2.0 Host 侧 overview + 分页 sessions**，为 1000–10000 条会话设计；详细任务、验收标准、环境坑见 [接手说明](docs/HANDOVER-2026-10-27.md)。
 
