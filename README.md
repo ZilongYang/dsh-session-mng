@@ -137,18 +137,18 @@ Host route (lib/api.js) ──► service (lib/service.js)
 ## 开发
 
 ```sh
-npm test                      # node --test，26 个单元/集成测试
+npm test                      # node --test，29 个单元/集成测试
 node --check index.js client.js lib/*.js
 npm --cache /tmp/dsh-npm-cache pack --dry-run
 ```
 
-实机验收：安装到 `desktop` profile → 确认 `settings.section` 出现 `session-mng-section` → 用**一次性测试会话**验证标题/归档/恢复/移动/删除 → 清理测试数据。0.1.1 的列表验收见 `docs/RELEASE-CHECKLIST-0.1.1.md`。
+实机验收：安装到 `desktop` profile → 确认 `settings.section` 出现 `session-mng-section` → 用**一次性测试会话**验证标题/归档/恢复/移动/删除 → 清理测试数据。0.1.3 的验收与实机记录见 `docs/RELEASE-CHECKLIST-0.1.3.md`。
 
 ## 当前状态与下一步
 
-- `0.1.3` 待发布：修复分支会话被当成子会话隐藏（三态会话模型 + 缩进显示 + 隐藏子代理提示），并修正「删除父会话级联删掉历史分支」「父会话因历史分支无法移动」两个问题；等实机验证后再发 npm/GitHub。
-- `0.1.2` 已发布到 npm / GitHub / Release；空会话默认隐藏、清理空会话、删除范围模态确认。
-- `0.1.1` 已发布；26 个测试全绿，0.1.2 包 33 个文件 / 568.3 kB。
+- `0.1.3` 已发布到 npm / GitHub / Release：三态会话模型（根/分支/子代理），分支默认显示并缩进在父会话下；删除父会话不再级联删掉普通分支；父会话有历史分支时也能移动；兼容声明增加 DSH `0.2.1-rc.3`。
+- `0.1.2` 已发布：空会话默认隐藏、清理空会话、删除范围模态确认。
+- 29 个测试全绿；0.1.3 包 36 个文件 / 579.7 kB（unpacked 821.7 kB）。
 - 市场 PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 等 1 天仓库年龄 gate，之后等维护者合并。
 - 下一项主任务：**0.2.0 Host 侧 overview + 分页 sessions**，为 1000–10000 条会话设计；详细任务、验收标准、环境坑见 [接手说明](docs/HANDOVER-2026-10-27.md)。
 
@@ -159,10 +159,10 @@ npm --cache /tmp/dsh-npm-cache pack --dry-run
 - [0.1.0 发布检查清单](docs/RELEASE-CHECKLIST-0.1.0.md)
 - [0.1.1 实施计划](docs/PLAN-2026-10-27.md)
 - [0.1.1 发布检查清单](docs/RELEASE-CHECKLIST-0.1.1.md)
-- [0.1.2 发布检查清单（待发布）](docs/RELEASE-CHECKLIST-0.1.2.md)
+- [0.1.2 发布检查清单](docs/RELEASE-CHECKLIST-0.1.2.md)
 - [0.1.3 实施计划（分支会话默认可见）](docs/PLAN-2026-10-28-branch-visibility.md)
 - [0.1.3 实施计划（历史分支删除/移动安全）](docs/PLAN-2026-10-28-legacy-fork-safety.md)
-- [0.1.3 发布检查清单（待发布）](docs/RELEASE-CHECKLIST-0.1.3.md)
+- [0.1.3 发布检查清单](docs/RELEASE-CHECKLIST-0.1.3.md)
 - [设计与实现说明](docs/01-design.md)
 - [开源、发 npm 与市场收录记录](docs/02-open-source-and-marketplace.md)
 - [路线图](ROADMAP.md)

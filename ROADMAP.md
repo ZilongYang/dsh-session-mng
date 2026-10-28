@@ -1,6 +1,6 @@
 # Roadmap
 
-> 当前：`0.1.2` 已发布；`0.1.3`（分支会话默认可见）已实现待实机验证/发布。市场 PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 的 `check` 已过，只差仓库 1 天年龄 gate（约 2026-10-28 00:44 Asia/Shanghai 自动重跑）。下一项主任务是 0.2.0 的 Host 分页；详细接手任务见 [docs/HANDOVER-2026-10-27.md](docs/HANDOVER-2026-10-27.md)。
+> 当前：`0.1.3` 已发布（npm latest / tag `v0.1.3` / Release）：三态会话模型、分支默认可见、删除/移动保护普通分支、兼容 DSH `0.2.1-rc.3`。市场 PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 的 `check` 已过，只差仓库 1 天年龄 gate（约 2026-10-28 00:44 Asia/Shanghai 自动重跑）。下一项主任务是 0.2.0 的 Host 分页；详细接手任务见 [docs/HANDOVER-2026-10-27.md](docs/HANDOVER-2026-10-27.md)。
 
 ## 0.1.0 — delivered
 
@@ -25,7 +25,7 @@
 - 「清理空会话（N）」批量清理已归档空会话，复用删除范围预览/确认。
 - 删除范围确认改为模态框，内容独立滚动、底部确认区固定，支持遮罩/Esc 取消。
 
-## 0.1.3 — delivered (待实机验证/发布)
+## 0.1.3 — delivered (published)
 
 - 三态会话模型：根 / 分支（fork）/ 子代理；分支不再因 `parentSession` 被误判成子会话隐藏。
 - 分支会话默认显示，缩进挂在父行下，父行「N 分支」、分支行「↳ 来自：父标题」；搜索父标题命中分支。

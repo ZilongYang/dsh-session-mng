@@ -139,3 +139,11 @@ curl -s https://awesome-dsh-plugin.com/plugins.json | grep -i session-mng
 - `npm publish`：`dsh-session-mng@0.1.2`，33 个文件，568.3 kB / unpacked 789.1 kB；约 3 分钟后 packument 出现，`latest` = 0.1.2，版本端点 200。
 - Git：main 已 push；tag `v0.1.2`；Release 见仓库 Releases。
 - marketplace 条目不变；卡片版本随 npm 自动更新，PR gate 仍只差仓库满 1 天。
+
+## 10. 0.1.3 更新发布（2026-10-28）
+
+- 功能修复：分支会话三态模型（根/分支/子代理）、分支默认可见并缩进；删除父会话不再级联普通分支；父会话有历史分支时也能移动；兼容声明增加 `0.2.1-rc.3`。
+- `npm publish`：`dsh-session-mng@0.1.3`，36 个文件，579.7 kB / unpacked 821.7 kB，shasum `e524c50988bb55a97b37ed08b6d94abcfc372b03`；约 1 分钟后 packument 出现 0.1.3，`latest` = 0.1.3。
+- Git：main 已 push（功能提交 `a827495`）；tag `v0.1.3`；Release https://github.com/ZilongYang/dsh-session-mng/releases/tag/v0.1.3
+- marketplace：条目不需要改 YAML，卡片版本随 npm 自动更新；PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 仍只差仓库年龄 gate。
+- 遗留：当前安装的 DSH `0.2.1-rc.3` 构建仍写 fork 的 `parentSession`（「独立 fork」变更只在 DSH 源码里），所以历史分支形态会继续出现，0.1.3 的删除/移动策略长期有效。

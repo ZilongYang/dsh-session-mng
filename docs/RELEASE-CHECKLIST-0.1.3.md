@@ -30,9 +30,11 @@
 - [ ] 子龙实机复核完整流程（重启/重载 Desktop 后）：工作区从 1 条变 2 条，分支缩进在父会话下；勾选开关后子代理出现；搜索父标题命中分支；删除父会话的预览里出现分支保留提示；父会话移动不再报 `has-descendants`。
 - [ ] 若缩进/徽标观感需要微调，再改一轮。
 
-## C. 发布
+## C. 发布（已完成）
 
-- [ ] `npm --cache /tmp/dsh-npm-cache --logs-dir /tmp/dsh-npm-logs pack --dry-run` 检查文件清单。
-- [ ] `npm publish` 0.1.3；确认版本端点 `latest` = 0.1.3。
-- [ ] Git commit / push / tag `v0.1.3` / GitHub Release。
-- [ ] 更新 CHANGELOG 的发布标记、README 当前状态、ROADMAP。
+- [x] `npm --cache /tmp/dsh-npm-cache --logs-dir /tmp/dsh-npm-logs pack --dry-run`：36 个文件 / 579.7 kB（unpacked 821.7 kB），shasum `e524c50988bb55a97b37ed08b6d94abcfc372b03`。
+- [x] `npm publish` 0.1.3 成功；约 1 分钟后 packument 出现 0.1.3，`latest` = 0.1.3，`dist.fileCount` = 36。
+- [x] Git：功能提交 `a827495`，main 已 push；tag `v0.1.3`；GitHub Release https://github.com/ZilongYang/dsh-session-mng/releases/tag/v0.1.3
+- [x] 更新 CHANGELOG、README 当前状态、ROADMAP、`docs/02-open-source-and-marketplace.md`（0.1.3 发布记录）。
+- [x] marketplace 条目不需要改 YAML（版本随 npm 自动更新；PR #9672 仍等仓库年龄 gate）。
+- [ ] 子龙实机复核（见 B 节）：缩进/徽标观感、删除预览分支提示、父会话移动。
