@@ -43,7 +43,8 @@ window.__ModuleLoader__.load({
         sortCreated: '创建时间',
         sortSize: '大小',
         sortTitle: '标题',
-        showSubagents: '显示子会话',
+        showSubagents: '显示子代理会话',
+        showSubagentsHint: '子代理会话由委派产生，默认隐藏；分支会话始终显示。',
         showBlank: '显示空会话',
         cleanupBlank: '清理空会话（{n}）',
         cleanupBlankHint: '批量删除已归档的空会话；未归档的空会话需先归档。',
@@ -70,7 +71,14 @@ window.__ModuleLoader__.load({
         untitled: '（未命名）',
         running: '运行中',
         archived: '已归档',
-        subagent: '子会话',
+        subagent: '子代理',
+        branch: '分支',
+        fromParent: '↳ 来自：{title}',
+        hiddenSubagentCount: '已隐藏 {n} 个子代理会话',
+        forkCount: '{n} 分支',
+        forkCountHint: '该会话有 {n} 个分支会话',
+        parentSession: '父会话',
+        parentMissing: '来源父会话已不存在',
         pinned: '已置顶',
         liveBadge: '已打开',
         noCwd: '无工作目录',
@@ -113,7 +121,9 @@ window.__ModuleLoader__.load({
         moving: '正在移动…',
         moveNoTarget: '没有可移动到的目标工作区。',
         moveLiveHint: '该会话已在当前 DSH 进程中打开，重启 DSH 后再移动。',
-        moveSubagentHint: '子会话不能单独移动。',
+        moveSubagentHint: '子代理会话不能单独移动。',
+        moveForkHint: '分支会话必须和父会话留在同一工作区，暂不支持单独移动。',
+        moveForkChildrenHint: '该会话有 {n} 个分支会话；移动只迁移本会话，分支会留在原工作区并继续独立使用。',
         moveDescendantsHint: '该会话包含子代理会话，暂时不能单独移动。',
         deleteAction: '彻底删除',
         deleteHint: '只允许删除已归档会话；删除后日志目录与工作区记录都会被移除，无法恢复。',
@@ -130,6 +140,7 @@ window.__ModuleLoader__.load({
         deleteNotArchived: '只有已归档会话可以彻底删除。',
         deleteLiveHint: '该会话已在当前 DSH 进程中打开，重启 DSH 后再删除。',
         deleteCascadeNote: '如果该会话有子代理会话，会一并删除。',
+        deleteForkNote: '另有 {n} 个历史分支会话不会被删除，但会失去「来自父会话」的来源标识；如需一起删除，请把它们也勾选进来。',
         archiveAction: '归档',
         archiving: '正在归档…',
         archiveDone: '已归档 {n} 个会话。',
@@ -164,7 +175,7 @@ window.__ModuleLoader__.load({
         timeout: '模型调用超时。',
         llmError: '模型调用失败：{message}',
         liveHint: '已打开的会话不能移动或彻底删除；重启 DSH 后重试。',
-        moveUnavailableHint: '所选会话中存在不可移动项（如跨工作区、有子会话或状态未就绪）。',
+        moveUnavailableHint: '所选会话中存在不可移动项（如跨工作区、分支/子代理会话或状态未就绪）。',
         archiveHint: '归档后会话会从活跃列表移到已归档，可在本页恢复。',
         moveArchivedHint: '移动不会改变归档状态，会话仍会留在已归档。',
         working: '处理中…',
@@ -197,6 +208,7 @@ window.__ModuleLoader__.load({
         sortSize: 'Size',
         sortTitle: 'Title',
         showSubagents: 'Show subagent sessions',
+        showSubagentsHint: 'Subagent sessions are produced by delegation and stay hidden by default; branch sessions are always listed.',
         showBlank: 'Show empty sessions',
         cleanupBlank: 'Clean up empty sessions ({n})',
         cleanupBlankHint: 'Permanently delete archived empty sessions; unarchived empty sessions must be archived first.',
@@ -224,6 +236,13 @@ window.__ModuleLoader__.load({
         running: 'Running',
         archived: 'Archived',
         subagent: 'Subagent',
+        branch: 'Branch',
+        fromParent: '↳ from: {title}',
+        hiddenSubagentCount: '{n} subagent sessions hidden',
+        forkCount: '{n} branch',
+        forkCountHint: 'This session has {n} branch sessions',
+        parentSession: 'Parent session',
+        parentMissing: 'Source session no longer exists',
         pinned: 'Pinned',
         liveBadge: 'Open',
         noCwd: 'No working directory',
@@ -267,6 +286,8 @@ window.__ModuleLoader__.load({
         moveNoTarget: 'No target workspace is available.',
         moveLiveHint: 'This session is open in this DSH process; restart DSH and retry.',
         moveSubagentHint: 'Subagent sessions cannot be moved on their own.',
+        moveForkHint: 'A branch session must stay in its parent\'s workspace, so it cannot be moved on its own.',
+        moveForkChildrenHint: 'This session has {n} branch sessions; moving migrates only this session, and the branches stay in the original workspace and keep working independently.',
         moveDescendantsHint: 'This session has subagent descendants and cannot move alone yet.',
         deleteAction: 'Delete permanently',
         deleteHint: 'Only archived sessions can be deleted. The log directory and workspace record are removed; this cannot be undone.',
@@ -283,6 +304,7 @@ window.__ModuleLoader__.load({
         deleteNotArchived: 'Only archived sessions can be permanently deleted.',
         deleteLiveHint: 'This session is open in this DSH process; restart DSH and retry.',
         deleteCascadeNote: 'Any subagent descendants are deleted too.',
+        deleteForkNote: '{n} branch sessions are not deleted, but they lose their "from parent" label. Select them too if they should be deleted as well.',
         archiveAction: 'Archive',
         archiving: 'Archiving…',
         archiveDone: 'Archived {n} sessions.',
@@ -317,7 +339,7 @@ window.__ModuleLoader__.load({
         timeout: 'The model call timed out.',
         llmError: 'The model call failed: {message}',
         liveHint: 'An open session cannot be moved or deleted; restart DSH and retry.',
-        moveUnavailableHint: 'Some selected sessions cannot be moved (cross-workspace, subagent descendants, or not ready).',
+        moveUnavailableHint: 'Some selected sessions cannot be moved (cross-workspace, branch or subagent sessions, or not ready).',
         archiveHint: 'Archiving moves the session from the active list to the archived list; restore it here.',
         moveArchivedHint: 'Moving does not change the archive state; the session stays archived.',
         working: 'Working…',
@@ -403,6 +425,7 @@ window.__ModuleLoader__.load({
 .dsm-row-main{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0;
  border:none;background:transparent;color:inherit;font:inherit;text-align:left;padding:0;cursor:pointer}
 .dsm-row-title{max-width:100%;font-size:13px;line-height:19px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dsm-branch-glyph{margin-right:4px;font-size:12px;line-height:1;color:var(--dsw-alias-label-secondary);opacity:.85}
 .dsm-row-meta{max-width:100%;font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dsm-badges{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .dsm-badge{display:inline-flex;align-items:center;height:17px;padding:0 5px;border-radius:4px;font-size:10px;line-height:17px;
@@ -543,6 +566,7 @@ window.__ModuleLoader__.load({
       if (code === 'session-running') return t('sessionRunning')
       if (code === 'session-writer-held') return t('writerHeld')
       if (code === 'has-descendants') return t('moveDescendantsHint')
+      if (code === 'branch-session') return t('moveForkHint')
       if (code === 'archived-required') return t('deleteNotArchived')
       if (code === 'unsupported-backend') return t('unsupportedBackend')
       if (code === 'unsupported-registry') return t('unsupportedRegistry')
@@ -659,15 +683,28 @@ window.__ModuleLoader__.load({
     }
 
     function Row({ row, selected, onToggle, onOpen, t }) {
+      const depth = row.branchDepth ?? 0
+      const branch = row.kind === 'fork'
+      const forkCount = row.forkCount ?? 0
       const badges = []
       if (row.running) badges.push(h(Badge, { key: 'run', tone: 'run' }, t('running')))
       if (row.archived) badges.push(h(Badge, { key: 'arch' }, t('archived')))
       if (row.live) badges.push(h(Badge, { key: 'live', tone: 'brand' }, t('liveBadge')))
       if (row.pinned) badges.push(h(Badge, { key: 'pin' }, t('pinned')))
+      if (branch) badges.push(h(Badge, { key: 'fork', tone: 'brand' }, t('branch')))
       if (row.isSubagent) badges.push(h(Badge, { key: 'sub', tone: 'warn' }, t('subagent')))
+      if (forkCount > 0) {
+        badges.push(
+          h('span', { key: 'children', title: t('forkCountHint', { n: forkCount }) },
+            h(Badge, null, t('forkCount', { n: forkCount }))),
+        )
+      }
       return h(
         'div',
-        { className: `dsm-row${selected === true ? ' selected' : ''}` },
+        {
+          className: `dsm-row${selected === true ? ' selected' : ''}${depth > 0 ? ' dsm-row-branch' : ''}`,
+          style: depth > 0 ? { paddingLeft: `${depth * 18}px` } : undefined,
+        },
         h('input', {
           type: 'checkbox',
           checked: selected === true,
@@ -677,10 +714,20 @@ window.__ModuleLoader__.load({
         h(
           'button',
           { type: 'button', className: 'dsm-row-main', onClick: onOpen, title: row.cwd || row.id },
-          h('span', { className: 'dsm-row-title' }, row.title === '' ? t('untitled') : row.title),
+          h(
+            'span',
+            { className: 'dsm-row-title' },
+            depth > 0 ? h('span', { className: 'dsm-branch-glyph', 'aria-hidden': 'true' }, '↳') : null,
+            row.title === '' ? t('untitled') : row.title,
+          ),
           h(
             'span',
             { className: 'dsm-row-meta' },
+            branch && row.parentTitle !== ''
+              ? `${t('fromParent', { title: row.parentTitle })} · `
+              : branch && row.parentPresent === false
+                ? `${t('parentMissing')} · `
+                : '',
             row.cwd === '' ? t('noCwd') : row.cwd,
             ' · ',
             row.id,
@@ -1016,6 +1063,9 @@ window.__ModuleLoader__.load({
                     h('div', { className: 'dsm-hint' },
                       `${t('deleteRoots')}: ${preview?.roots?.length ?? 0} · ${t('deleteDescendants')}: ${preview?.descendantCount ?? 0} · ${t('deleteTotalSize', { size: formatBytes(preview?.totalBytes ?? 0) })}`,
                     ),
+                    (preview?.forkChildren?.length ?? 0) > 0
+                      ? h('p', { className: 'dsm-hint' }, t('deleteForkNote', { n: preview.forkChildren.length }))
+                      : null,
                     h('div', { className: 'dsm-scope-list' },
                       rows.map((row) =>
                         h(
@@ -1118,6 +1168,7 @@ window.__ModuleLoader__.load({
               row.archived ? h(Badge, null, t('archived')) : null,
               row.live ? h(Badge, { tone: 'brand' }, t('liveBadge')) : null,
               row.pinned ? h(Badge, null, t('pinned')) : null,
+              row.kind === 'fork' ? h(Badge, { tone: 'brand' }, t('branch')) : null,
               row.isSubagent ? h(Badge, { tone: 'warn' }, t('subagent')) : null,
             ),
           ),
@@ -1139,6 +1190,16 @@ window.__ModuleLoader__.load({
             { className: 'dsm-meta' },
             h('dt', null, t('workspace')),
             h('dd', null, row.workspaceTitle || t('workspaceUngrouped')),
+            row.kind === 'fork'
+              ? h(React.Fragment, null,
+                  h('dt', null, t('parentSession')),
+                  h('dd', null,
+                    row.parentTitle !== ''
+                      ? row.parentTitle
+                      : row.parentPresent === false
+                        ? t('parentMissing')
+                        : (row.parentSessionId || '')))
+              : null,
             h('dt', null, t('path')),
             h('dd', { title: row.cwd }, h('span', { className: 'dsm-mono' }, row.cwd || t('noCwd'))),
             h('dt', null, t('id')),
@@ -1168,9 +1229,12 @@ window.__ModuleLoader__.load({
           h('h3', null, t('moveTo')),
           h('p', { className: 'dsm-hint', style: { margin: '0 0 8px' } }, t('moveHint')),
           row.archived ? h('p', { className: 'dsm-hint', style: { margin: '0 0 8px' } }, t('moveArchivedHint')) : null,
+          movable && (row.forkCount ?? 0) > 0
+            ? h('p', { className: 'dsm-hint', style: { margin: '0 0 8px' } }, t('moveForkChildrenHint', { n: row.forkCount }))
+            : null,
           !movable
             ? h('p', { className: 'dsm-hint' },
-                row.live ? t('moveLiveHint') : row.isSubagent ? t('moveSubagentHint') : row.can?.move === false ? t('moveDescendantsHint') : t('moveNoTarget'))
+                row.live ? t('moveLiveHint') : row.kind === 'fork' ? t('moveForkHint') : row.isSubagent ? t('moveSubagentHint') : row.can?.move === false ? t('moveDescendantsHint') : t('moveNoTarget'))
             : h(
                 'div',
                 { className: 'dsm-title-row' },
@@ -1222,6 +1286,38 @@ window.__ModuleLoader__.load({
     // ---------------------------------------------------------------------
 
     /**
+     * Order one group's rows so a branch sits directly under its parent, the
+     * way the sidebar nests it. A branch whose parent is filtered out of this
+     * group stays at the top level and keeps its "from parent" meta line.
+     */
+    function orderBranchRows(rows) {
+      const ids = new Set(rows.map((row) => row.id))
+      const childrenOf = new Map()
+      const tops = []
+      for (const row of rows) {
+        const parentId = row.kind === 'fork' ? row.parentSessionId : null
+        if (parentId !== null && parentId !== row.id && ids.has(parentId)) {
+          const list = childrenOf.get(parentId) ?? []
+          list.push(row)
+          childrenOf.set(parentId, list)
+        } else {
+          tops.push(row)
+        }
+      }
+      const out = []
+      const visited = new Set()
+      const visit = (row, depth) => {
+        if (visited.has(row.id)) return
+        visited.add(row.id)
+        out.push(depth === 0 ? row : { ...row, branchDepth: depth })
+        for (const child of childrenOf.get(row.id) ?? []) visit(child, depth + 1)
+      }
+      for (const row of tops) visit(row, 0)
+      // A corrupt parent cycle must not silently drop rows from the list.
+      return out.length === rows.length ? out : rows
+    }
+
+    /**
      * Derive the filtered / grouped / rendered view for the list.
      * Pure so the selection-pruning effect can use it before the loading guard.
      */
@@ -1237,7 +1333,7 @@ window.__ModuleLoader__.load({
         if (workspaceFilter !== 'all' && workspaceFilter !== 'ungrouped' && row.workspaceId !== workspaceFilter) return false
         if (showBlank !== true && row.blank === true) return false
         if (filtering) {
-          const haystack = `${row.title}\n${row.cwd}\n${row.id}`.toLowerCase()
+          const haystack = `${row.title}\n${row.cwd}\n${row.id}\n${row.parentTitle ?? ''}`.toLowerCase()
           if (!haystack.includes(text)) return false
         }
         return true
@@ -1250,7 +1346,7 @@ window.__ModuleLoader__.load({
       })
       const baseGroups = []
       for (const workspace of workspaceOrder) {
-        const groupRows = sorted.filter((row) => row.workspaceId === workspace.id)
+        const groupRows = orderBranchRows(sorted.filter((row) => row.workspaceId === workspace.id))
         if (groupRows.length === 0) continue
         baseGroups.push({
           ...workspace,
@@ -1258,7 +1354,7 @@ window.__ModuleLoader__.load({
           bytes: groupRows.reduce((sum, row) => sum + row.sizeBytes, 0),
         })
       }
-      const ungroupedRows = sorted.filter((row) => row.workspaceId === null)
+      const ungroupedRows = orderBranchRows(sorted.filter((row) => row.workspaceId === null))
       if (ungroupedRows.length > 0) {
         baseGroups.push({
           id: 'ungrouped',
@@ -1647,6 +1743,9 @@ window.__ModuleLoader__.load({
               blankRows.length > 0 && !showBlank
                 ? ` · ${t('hiddenBlankCount', { n: blankRows.length })}`
                 : '',
+              (state.totals?.hiddenSubagents ?? 0) > 0 && !includeSubagents
+                ? ` · ${t('hiddenSubagentCount', { n: state.totals.hiddenSubagents })}`
+                : '',
             ),
             blankActiveCount > 0 && showBlank
               ? h('p', { className: 'dsm-hint' }, t('blankActiveHint', { n: blankActiveCount }))
@@ -1726,7 +1825,7 @@ window.__ModuleLoader__.load({
             h('option', { value: 'size' }, t('sortSize')),
             h('option', { value: 'title' }, t('sortTitle')),
           ),
-          h('label', { className: 'dsm-check' },
+          h('label', { className: 'dsm-check', title: t('showSubagentsHint') },
             h('input', {
               type: 'checkbox',
               checked: includeSubagents,
@@ -1802,7 +1901,11 @@ window.__ModuleLoader__.load({
                     }, t('clearSelection')),
                     !selectedMovable && selectedRows.length > 0
                       ? h('span', { className: 'dsm-hint' },
-                          selectedRows.some((row) => row.live || row.running) ? t('liveHint') : t('moveUnavailableHint'))
+                          selectedRows.some((row) => row.live || row.running)
+                            ? t('liveHint')
+                            : selectedRows.some((row) => row.kind === 'fork')
+                              ? t('moveForkHint')
+                              : t('moveUnavailableHint'))
                       : null,
                   )
                 : null,

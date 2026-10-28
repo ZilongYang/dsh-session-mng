@@ -1,6 +1,6 @@
 # dsh-session-mng 设计与实现说明
 
-> 对应版本 0.1.0，实测宿主 DSH 0.2.1-rc.2（Desktop `desktop` profile）。本文面向代码评审与二次开发，记录可观察行为、事务边界、版本敏感点和已知限制。
+> 对应版本 0.1.3，实测宿主 DSH 0.2.1-rc.3（Desktop `desktop` profile；0.2.1-rc.2 亦验证过）。本文面向代码评审与二次开发，记录可观察行为、事务边界、版本敏感点和已知限制。
 
 ## 1. 设计约束
 
@@ -43,13 +43,13 @@
 
 | 路由 | 说明 |
 |---|---|
-| `GET /state?subagents=0\|1` | 总览；默认过滤子会话 |
+| `GET /state?subagents=0\|1` | 总览；默认过滤子代理会话（分支会话始终返回） |
 | `POST /preview` | 最近消息（最多 10 条） |
 | `POST /title/propose` | 整段会话标题提案（只读） |
 | `POST /title/apply` | 确认写入标题；live 或 cold |
 | `POST /archive` | `{sessionIds, stopActivity?}` |
 | `POST /unarchive` | `{sessionIds}` |
-| `POST /delete/preview` | 删除范围预览（根 + 子代理后代） |
+| `POST /delete/preview` | 删除范围预览（根 + 子代理后代 + 分支提示） |
 | `POST /delete` | `{sessionIds, confirm:true}` |
 | `POST /move` | `{sessionIds, workspaceId}` |
 
@@ -65,12 +65,20 @@
 4. `sessionQuery.readTitleSnapshots(ids)`：只为缺失标题的行补读。
 5. `archivedSessionIds` / `pinnedSessionIds`。
 
+会话按三类打标（`kind`），这是 0.1.3 修正的核心：**不能用「有 `parentSession`」判定子会话**，因为分支会话（fork）也带 parent。
+
+- `root`：无 parent；
+- `fork`：非子代理且有 parent（`isSeeded:true`、`delegationDepth:0` 为辅证）。它是用户会话，默认可见、可改标题/归档/删除，但不可单独移动；
+- `subagent`：`origin:'subagent'` 或 `delegationDepth≥1`（委派产生）。`subagents=0` 时过滤，并计入 `totals.hiddenSubagents` 供 UI 提示。
+
+行字段：`kind` / `isFork` / `isSubagent`（兼容）/ `parentSessionId` / `parentTitle` / `parentPresent` / `forkCount`；`totals` 附带 `forks` / `hiddenSubagents`。
+
 每个会话行带 `can`：
 
 - `title`：有 `llm`；
 - `archive`：未归档；
 - `restore`：已归档；
-- `move`：JSONL + zstd + workspace 缓存 seam 可用 + 非 live/running/子会话/有 parent；
+- `move`：JSONL + zstd + workspace 缓存 seam 可用 + 非 live/running + `kind === 'root'`（分支要留在父会话工作区）；
 - `delete`：JSONL + 已归档 + 非 live；
 - `open`：总是 true（客户端再判断 `uiWorkspace` 是否存在）。
 
@@ -110,8 +118,8 @@
 1. `capabilities.move`：JSONL + zstd + `canReconcileMove(registry)`。
 2. `stat(id)` 存在，header `cwd` 非空。
 3. 非 live（`ctx.sessions.get(id) === undefined`）；非 running。
-4. `header.origin !== 'subagent'` 且无 `parentSession`。
-5. `traceSession(id)` 无 descendants。
+4. 子代理会话（`origin:'subagent'` 或 `delegationDepth≥1`）不能单独移动；普通分支（含历史 fork）是独立会话，不阻止移动。
+5. `traceSession(id)` 无**子代理** descendants（普通分支会出现在谱系里，但不再阻止移动）。
 6. 目标 workspace 存在且 `status() === 'ok'`；目标目录不存在。
 7. 源目录唯一；目标目录由 `locate({id,cwd:target.path})` 推导。
 8. `open(id,'write')` 成功后再 close，证明没有其他进程正在写。
@@ -159,19 +167,20 @@ targetDir  = dirname(locate({id, cwd: target.path}))
 ### 9.1 预览
 
 - 每个 root 必须已归档。
-- `traceSession(root)` 递归收集 descendants；后代不要求已归档。
-- 每个 id：找目录、递归算字节、尝试 `readSession` 标记可读/损坏。
-- 返回 roots、descendantCount、sessions、totalBytes、errors。
+- `traceSession(root)` 递归收集 descendants，并按 header 拆成两类：**子代理**（`origin:'subagent'` / `delegationDepth≥1`，随 root 级联）与**普通分支**（历史 fork 仍带 `parentSession`）。遇到分支即停止下钻，分支的子代不随 root 删除。
+- 每个待删 id：找目录、递归算字节、尝试 `readSession` 标记可读/损坏；分支只读标题，供「不会被删除」提示使用。
+- 返回 roots、descendantCount（仅子代理）、sessions、forkChildren、totalBytes、errors。
 
 ### 9.2 执行
 
 1. `confirm === true`；重新校验 root 仍已归档（防 TOCTOU）。
-2. 重算 roots + descendants；总 id 数 > 500 拒绝。
+2. 重算 roots + **子代理** descendants；普通分支不参与；总 id 数 > 500 拒绝。
 3. 任一会话 live 或 running → 拒绝（live 会在内存留下幽灵行）。
 4. 每个存在的目录 `rename` 到 `tempRoot/delete-<batch>-<id>-<rand>`；记录映射。
 5. 清理 registry：`unarchiveSession`、所属 workspace `detachSession`、可选删除 headers/sessionPaths 缓存。
 6. 成功 → `rm` 所有 trash 目录并验证；失败 → 把 trash 移回原位，并尽力 `attachSession` + `archiveSession` 恢复账本，返回错误。
 7. 若最终 rm 失败 → `leftover-trash`，details 给出残留路径；不谎报成功。
+8. 保留下来的分支 header 仍记录已删除的父 id；宿主 0.2.1-rc.3 把这类历史 fork 当独立会话，插件列表用 `parentPresent:false` 显示「来源父会话已不存在」。
 
 ## 10. 安全
 
@@ -187,16 +196,17 @@ targetDir  = dirname(locate({id, cwd: target.path}))
 |---|---|
 | `test/title.test.js` | 清洗、UTF-8 截断、turn 抽取、预算收缩 |
 | `test/store-jsonl.test.js` | header 解析、cwd 重写、后续字节不变、generation 选择、stage/rollback、删除 round-trip |
-| `test/state.test.js` | 工作区归属、归档/置顶、子会话过滤、orphans、capabilities |
-| `test/service.test.js` | 移动成功、workspace seam 失败回滚、删除成功/拒绝、冷标题事件形状 |
+| `test/state.test.js` | 工作区归属、归档/置顶、三态分类（根/分支/子代理）、`parentTitle`/`parentPresent`、orphans、capabilities |
+| `test/service.test.js` | 移动成功、workspace seam 失败回滚、删除成功/拒绝、删除保留普通分支、分支不阻止移动、子代理仍阻止移动、冷标题事件形状 |
 | `test/api.test.js` | fence、state 信封、未知 action、方法、坏 JSON、超大 body、错误码 |
 
-`node --test` 26 个测试全绿。
+`node --test` 29 个测试全绿。
 
 ## 12. 已知限制与 0.2.0 方向
 
 - live 会话不能移动/删除（重启后重试）。
 - 有子代理后代的会话不能单独移动（0.2.0 整枝移动）。
+- 普通分支（含历史 fork）不随父会话删除，会失去来源标识。宿主「普通 fork 不再写 `parentSession`」的变更在 DSH 源码里已合入，但**尚未进入当前安装的 0.2.1-rc.3 构建**（2026-10-28 实测：新建 fork 仍带 `parentSession`，app.asar 里仍有旧写入代码），所以这类「历史分支」形态短期仍会持续出现；插件对两种形态一视同仁。
 - 移动是整目录复制，大日志会慢；0.2.0 评估 rename/增量。
 - 非 JSONL 后端不支持移动/删除。
 - workspace 缓存 seam 是版本敏感点；升级 DSH 后先跑测试与实机验收。

@@ -342,6 +342,126 @@ test('delete refuses an unarchived session', { skip: !HAS_ZSTD }, async () => {
   }
 })
 
+/**
+ * Root session with an ordinary (historical) fork child and, unless disabled, a
+ * delegation subagent child. `traceSession` mirrors the host: every child that
+ * records `parentSession` is reported as a descendant, forks included.
+ */
+async function makeLineageFixture(options = {}) {
+  if (!HAS_ZSTD) return undefined
+  const base = await mkdtemp(join(tmpdir(), 'dsh-session-mng-lineage-'))
+  const root = join(base, 'sessions')
+  const cwd = '/tmp/dsm-lineage'
+  const newCwd = '/tmp/dsm-lineage-new'
+  const rootId = 'session-lineage-root'
+  const forkId = 'session-lineage-fork'
+  const subId = 'subagent-lineage-child'
+  const write = async (header, events = []) => {
+    const dir = join(root, projectKey(cwd), header.id)
+    await mkdir(dir, { recursive: true })
+    await writeFile(join(dir, 'session.v4.jsonl.zstd'), Buffer.concat([
+      frame(`${JSON.stringify(header)}\n`),
+      ...events.map((event) => frame(`${JSON.stringify(event)}\n`)),
+    ]))
+    return dir
+  }
+  const rootHeader = { type: 'session', version: 4, id: rootId, createdAt: 1, cwd, isSeeded: false, delegationDepth: 0 }
+  const forkHeader = {
+    type: 'session', version: 4, id: forkId, createdAt: 2, cwd,
+    parentSession: rootId, isSeeded: true, delegationDepth: 0,
+  }
+  const subHeader = {
+    type: 'session', version: 4, id: subId, createdAt: 3, cwd,
+    parentSession: rootId, origin: 'subagent', delegationDepth: 1,
+  }
+  const rootDir = await write(rootHeader, [
+    { type: 'user/message', seq: 0, time: 1, data: { content: [{ type: 'text', text: 'root' }] } },
+  ])
+  const forkDir = await write(forkHeader, [
+    { type: 'user/message', seq: 0, time: 1, data: { content: [{ type: 'text', text: 'fork' }] } },
+  ])
+  const withSubagent = options.withSubagent !== false
+  const subDir = withSubagent ? await write(subHeader, []) : undefined
+  const workspace = makeWorkspace('w', cwd, [rootId, forkId, ...(withSubagent ? [subId] : [])])
+  const newWorkspace = makeWorkspace('w-new', newCwd, [])
+  const persistence = makePersistence(root)
+  const query = makeQuery(persistence, root)
+  query.traceSession = async (id) => ({
+    descendants: id === rootId
+      ? [
+          { session: { header: forkHeader, events: [] }, descendants: [] },
+          ...(withSubagent ? [{ session: { header: subHeader, events: [] }, descendants: [] }] : []),
+        ]
+      : [],
+  })
+  const registry = makeRegistry([workspace, newWorkspace], [rootId])
+  const ctx = {
+    sessions: { get: () => undefined },
+    sessionPersistence: persistence,
+    sessionQuery: query,
+    workspaceRegistry: registry,
+    sessionTitle: { rename() { throw new Error('live only') } },
+    llm: {},
+    agents: { get: () => undefined },
+    logger: { info() {}, warn() {} },
+    get(name) {
+      if (name === 'agents') return this.agents
+      return this[name]
+    },
+  }
+  return { base, root, cwd, newCwd, rootId, forkId, subId, rootDir, forkDir, subDir, workspace, newWorkspace, registry, ctx }
+}
+
+test('delete cascades subagents but keeps an ordinary fork', { skip: !HAS_ZSTD }, async () => {
+  const fixture = await makeLineageFixture()
+  try {
+    const service = createService(fixture.ctx, normalizeConfig({ sessionsRoot: fixture.root }))
+    const preview = await service.deletePreview([fixture.rootId])
+    assert.equal(preview.descendantCount, 1)
+    assert.deepEqual(preview.sessions.map((row) => row.id), [fixture.rootId, fixture.subId])
+    assert.deepEqual(preview.forkChildren.map((row) => row.id), [fixture.forkId])
+    assert.equal(preview.forkChildren[0].parentId, fixture.rootId)
+
+    const result = await service.remove([fixture.rootId], true)
+    assert.equal(result.totals.succeeded, 1, JSON.stringify(result))
+    assert.equal(result.results[0].deleted, 2)
+    assert.equal(await currentLogFile(fixture.rootDir), undefined)
+    assert.equal(await currentLogFile(fixture.subDir), undefined)
+    assert.ok(await currentLogFile(fixture.forkDir), 'the ordinary fork log must survive its source')
+    assert.deepEqual(fixture.registry.archivedSessionIds, [])
+    assert.deepEqual(fixture.workspace.sessionIds, [fixture.forkId])
+  } finally {
+    await rm(fixture.base, { recursive: true, force: true })
+  }
+})
+
+test('an ordinary fork descendant no longer blocks moving its source', { skip: !HAS_ZSTD }, async () => {
+  const fixture = await makeLineageFixture({ withSubagent: false })
+  try {
+    const service = createService(fixture.ctx, normalizeConfig({ sessionsRoot: fixture.root }))
+    const result = await service.move([fixture.rootId], 'w-new')
+    assert.equal(result.totals.succeeded, 1, JSON.stringify(result))
+    assert.deepEqual(fixture.workspace.sessionIds, [fixture.forkId])
+    assert.deepEqual(fixture.newWorkspace.sessionIds, [fixture.rootId])
+    assert.ok(await currentLogFile(fixture.forkDir), 'the fork stays where it was')
+  } finally {
+    await rm(fixture.base, { recursive: true, force: true })
+  }
+})
+
+test('subagent descendants still block moving their source', { skip: !HAS_ZSTD }, async () => {
+  const fixture = await makeLineageFixture()
+  try {
+    const service = createService(fixture.ctx, normalizeConfig({ sessionsRoot: fixture.root }))
+    const result = await service.move([fixture.rootId], 'w-new')
+    assert.equal(result.totals.failed, 1)
+    assert.equal(result.results[0].error.code, 'has-descendants')
+    assert.deepEqual(fixture.newWorkspace.sessionIds, [])
+  } finally {
+    await rm(fixture.base, { recursive: true, force: true })
+  }
+})
+
 test('cold title apply appends the official session/title event', { skip: !HAS_ZSTD }, async () => {
   const fixture = await makeFixture()
   try {

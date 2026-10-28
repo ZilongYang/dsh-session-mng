@@ -1,6 +1,6 @@
 # Roadmap
 
-> 当前：`0.1.1` 已发布（npm latest / tag `v0.1.1` / Release）。市场 PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 的 `check` 已过，只差仓库 1 天年龄 gate（约 2026-10-28 00:44 Asia/Shanghai 自动重跑）。下一项主任务是 0.2.0 的 Host 分页；详细接手任务见 [docs/HANDOVER-2026-10-27.md](docs/HANDOVER-2026-10-27.md)。
+> 当前：`0.1.2` 已发布；`0.1.3`（分支会话默认可见）已实现待实机验证/发布。市场 PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 的 `check` 已过，只差仓库 1 天年龄 gate（约 2026-10-28 00:44 Asia/Shanghai 自动重跑）。下一项主任务是 0.2.0 的 Host 分页；详细接手任务见 [docs/HANDOVER-2026-10-27.md](docs/HANDOVER-2026-10-27.md)。
 
 ## 0.1.0 — delivered
 
@@ -25,6 +25,14 @@
 - 「清理空会话（N）」批量清理已归档空会话，复用删除范围预览/确认。
 - 删除范围确认改为模态框，内容独立滚动、底部确认区固定，支持遮罩/Esc 取消。
 
+## 0.1.3 — delivered (待实机验证/发布)
+
+- 三态会话模型：根 / 分支（fork）/ 子代理；分支不再因 `parentSession` 被误判成子会话隐藏。
+- 分支会话默认显示，缩进挂在父行下，父行「N 分支」、分支行「↳ 来自：父标题」；搜索父标题命中分支。
+- 子代理仍默认隐藏，总览行提示「已隐藏 N 个子代理会话」；开关改名「显示子代理会话」。
+- 删除只级联子代理：历史分支保留（预览提示会失去来源标识），不再静默删除；父会话有历史分支时也能移动。
+- 分支的来源父会话被删除后显示「来源父会话已不存在」；移动有分支的会话时提示分支留在原工作区。
+
 ## 0.2.0 — next (planned)
 
 首要目标：真正支撑 1000–10000 条会话，不再首屏拉全量 `state`。实施前先写 `docs/PLAN-2026-10-28.md` 并获批准。
@@ -43,7 +51,7 @@
 - 内容全文搜索（复用 `sessionQuery.searchSessions` / `searchEvents`），不只按标题/路径/id。
 - 导出所选会话为 Markdown / JSON（删除前的安全网；批量）。
 - 置顶 / 取消置顶（`workspaceRegistry.pinSession` / `unpinSession`）。
-- 整枝移动（父会话 + 子代理后代一起迁移）。
+- 整枝移动（父会话 + 分支会话 + 子代理后代一起迁移），或在移动时保留父链接。
 - 会话体检 / 修复：重复目录、幽灵归档、workspace 账本与 header cwd 不一致、损坏日志报告。
 - 可选回收站（与「彻底删除」并存，默认关闭）。
 - 移动的增量实现（rename 而不是整目录复制），大日志更快。
