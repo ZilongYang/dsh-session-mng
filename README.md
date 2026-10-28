@@ -59,7 +59,7 @@ dsh plugin --profile <profile> add link:/绝对路径/dsh-session-mng
 
 Host 半是进程内模块：装完如果看不到页面，重启一次 dsh/应用再刷新页面；Client 半刷新页面即可。
 
-> 市场状态：awesome-dsh-plugin 收录 PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 的 `check` 已通过；`Submission gate` 目前只差仓库满 1 天（约 2026-10-28 00:44 Asia/Shanghai 自动重跑），无需重新提交。合并后 dshmarket 读取同一份目录，卡片版本随 npm 显示 `0.1.1`。
+> 市场状态：awesome-dsh-plugin 收录 PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 已于 2026-10-27 合并（`check` 与 `Submission gate` 均通过）。dshmarket 读取同一份目录，卡片版本随 npm 自动更新，当前显示 `0.1.3`。
 
 ## 使用
 
@@ -149,7 +149,7 @@ npm --cache /tmp/dsh-npm-cache pack --dry-run
 - `0.1.3` 已发布到 npm / GitHub / Release：三态会话模型（根/分支/子代理），分支默认显示并缩进在父会话下；删除父会话不再级联删掉普通分支；父会话有历史分支时也能移动；兼容声明增加 DSH `0.2.1-rc.3`。
 - `0.1.2` 已发布：空会话默认隐藏、清理空会话、删除范围模态确认。
 - 29 个测试全绿；0.1.3 包 36 个文件 / 579.7 kB（unpacked 821.7 kB）。
-- 市场 PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 等 1 天仓库年龄 gate，之后等维护者合并。
+- 市场条目已收录：PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 已于 2026-10-27 合并（`check` 与仓库年龄 gate 均通过）；卡片版本随 npm 自动更新，当前 0.1.3。
 - 下一项主任务：**0.2.0 Host 侧 overview + 分页 sessions**，为 1000–10000 条会话设计；详细任务、验收标准、环境坑见 [接手说明](docs/HANDOVER-2026-10-27.md)。
 
 ## 文档索引

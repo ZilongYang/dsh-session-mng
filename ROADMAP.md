@@ -1,6 +1,6 @@
 # Roadmap
 
-> 当前：`0.1.3` 已发布（npm latest / tag `v0.1.3` / Release）：三态会话模型、分支默认可见、删除/移动保护普通分支、兼容 DSH `0.2.1-rc.3`。市场 PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 的 `check` 已过，只差仓库 1 天年龄 gate（约 2026-10-28 00:44 Asia/Shanghai 自动重跑）。下一项主任务是 0.2.0 的 Host 分页；详细接手任务见 [docs/HANDOVER-2026-10-27.md](docs/HANDOVER-2026-10-27.md)。
+> 当前：`0.1.3` 已发布（npm latest / tag `v0.1.3` / Release）：三态会话模型、分支默认可见、删除/移动保护普通分支、兼容 DSH `0.2.1-rc.3`。市场条目已收录（PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 于 2026-10-27 合并）。下一项主任务是 0.2.0 的 Host 分页；详细接手任务见 [docs/HANDOVER-2026-10-27.md](docs/HANDOVER-2026-10-27.md)。
 
 ## 0.1.0 — delivered
 
