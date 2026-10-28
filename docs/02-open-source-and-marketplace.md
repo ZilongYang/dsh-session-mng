@@ -147,3 +147,11 @@ curl -s https://awesome-dsh-plugin.com/plugins.json | grep -i session-mng
 - Git：main 已 push（功能提交 `a827495`）；tag `v0.1.3`；Release https://github.com/ZilongYang/dsh-session-mng/releases/tag/v0.1.3
 - marketplace：条目不需要改 YAML，卡片版本随 npm 自动更新；PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 仍只差仓库年龄 gate。
 - 遗留：当前安装的 DSH `0.2.1-rc.3` 构建仍写 fork 的 `parentSession`（「独立 fork」变更只在 DSH 源码里），所以历史分支形态会继续出现，0.1.3 的删除/移动策略长期有效。
+
+## 11. 0.1.4 更新发布（2026-10-28）
+
+- 交互修复：详情页标题/操作行吸顶；操作结果改为右下角浮动 toast（成功 5 秒自动隐藏）；头部按钮移到标题右侧。
+- 空会话：「归档空会话（N）」一键分批归档；「清理空会话（N）」只要有已归档空会话就显示；删除范围预览与删除按 `maxBatch`（50）分批，一次确认可清理任意数量。
+- `npm publish`：`dsh-session-mng@0.1.4`，37 个文件，583.2 kB / unpacked 834.8 kB，shasum `aac611c2e007d45dda370c9b96337a914d300cda`；本次 registry 传播约 6 分钟，`latest` = 0.1.4，`dist.fileCount` = 37。
+- Git：main 已 push（功能提交 `0cf4d55`）；tag `v0.1.4`；Release https://github.com/ZilongYang/dsh-session-mng/releases/tag/v0.1.4
+- marketplace：条目不需要改 YAML，卡片版本随 npm 自动更新为 0.1.4。

@@ -25,9 +25,10 @@
   - 80 条已归档空会话：点「清理空会话（80）」→ 预览分 2 批（50+30）请求并合并显示「根会话: 80」；勾选确认后删除也分 2 批，toast 汇总「成功 80，失败 0」。
 - [ ] 子龙实机：滚动详情页时标题行保持可见；操作后提示在右下角且自动消失；空会话按钮行为符合预期。
 
-## C. 发布（未开始）
+## C. 发布（已完成）
 
-- [ ] `npm --cache /tmp/dsh-npm-cache --logs-dir /tmp/dsh-npm-logs pack --dry-run`。
-- [ ] `npm publish` 0.1.4；确认 `latest` = 0.1.4。
-- [ ] Git commit / push / tag `v0.1.4` / GitHub Release。
-- [ ] 更新 README 当前状态、ROADMAP、`docs/02-open-source-and-marketplace.md`。
+- [x] `npm --cache /tmp/dsh-npm-cache --logs-dir /tmp/dsh-npm-logs pack --dry-run`：37 个文件 / 583.2 kB（unpacked 834.8 kB），shasum `aac611c2e007d45dda370c9b96337a914d300cda`。
+- [x] `npm publish` 0.1.4 成功（registry 返回 202 + `+ dsh-session-mng@0.1.4`）；本次传播较慢，约 6 分钟后 `0.1.4` 版本端点 200、`latest` = 0.1.4，`dist.fileCount` = 37。
+- [x] Git：功能提交 `0cf4d55`，main 已 push；tag `v0.1.4`；GitHub Release https://github.com/ZilongYang/dsh-session-mng/releases/tag/v0.1.4
+- [x] 更新 README 当前状态、ROADMAP、`docs/02-open-source-and-marketplace.md`（0.1.4 发布记录）。
+- [x] marketplace 条目不需要改 YAML（版本随 npm 自动更新，卡片显示 0.1.4）。
