@@ -146,10 +146,11 @@ npm --cache /tmp/dsh-npm-cache pack --dry-run
 
 ## 当前状态与下一步
 
+- `0.1.4` 已发布到 npm / GitHub / Release：详情页标题行吸顶；操作结果改为浮动 toast（成功 5 秒自动消失）；头部按钮移到标题右侧；新增「归档空会话（N）」，「清理空会话（N）」只要有已归档空会话就显示，且超过 50 条自动分批预览/删除。
 - `0.1.3` 已发布到 npm / GitHub / Release：三态会话模型（根/分支/子代理），分支默认显示并缩进在父会话下；删除父会话不再级联删掉普通分支；父会话有历史分支时也能移动；兼容声明增加 DSH `0.2.1-rc.3`。
 - `0.1.2` 已发布：空会话默认隐藏、清理空会话、删除范围模态确认。
-- 29 个测试全绿；0.1.3 包 36 个文件 / 579.7 kB（unpacked 821.7 kB）。
-- 市场条目已收录：PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 已于 2026-10-27 合并（`check` 与仓库年龄 gate 均通过）；卡片版本随 npm 自动更新，当前 0.1.3。
+- 29 个测试全绿；0.1.4 包 37 个文件 / 583.2 kB（unpacked 834.8 kB）。
+- 市场条目已收录：PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 已于 2026-10-27 合并（`check` 与仓库年龄 gate 均通过）；卡片版本随 npm 自动更新，当前 0.1.4。
 - 下一项主任务：**0.2.0 Host 侧 overview + 分页 sessions**，为 1000–10000 条会话设计；详细任务、验收标准、环境坑见 [接手说明](docs/HANDOVER-2026-10-27.md)。
 
 ## 文档索引
@@ -163,6 +164,7 @@ npm --cache /tmp/dsh-npm-cache pack --dry-run
 - [0.1.3 实施计划（分支会话默认可见）](docs/PLAN-2026-10-28-branch-visibility.md)
 - [0.1.3 实施计划（历史分支删除/移动安全）](docs/PLAN-2026-10-28-legacy-fork-safety.md)
 - [0.1.3 发布检查清单](docs/RELEASE-CHECKLIST-0.1.3.md)
+- [0.1.4 发布检查清单](docs/RELEASE-CHECKLIST-0.1.4.md)
 - [设计与实现说明](docs/01-design.md)
 - [开源、发 npm 与市场收录记录](docs/02-open-source-and-marketplace.md)
 - [路线图](ROADMAP.md)

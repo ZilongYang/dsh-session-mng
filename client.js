@@ -48,7 +48,9 @@ window.__ModuleLoader__.load({
         showBlank: '显示空会话',
         cleanupBlank: '清理空会话（{n}）',
         cleanupBlankHint: '批量删除已归档的空会话；未归档的空会话需先归档。',
-        blankActiveHint: '另有 {n} 个未归档空会话，归档后才能清理。',
+        cleanupBlankLockedHint: '有 {n} 个已归档空会话已在 DSH 中打开，重启后才能清理。',
+        archiveBlank: '归档空会话（{n}）',
+        archiveBlankHint: '把未归档的空会话批量归档；归档后即可用「清理空会话」彻底删除。',
         hiddenBlankCount: '已隐藏 {n} 个空会话',
         selectAll: '全选当前列表',
         expandAll: '展开全部',
@@ -212,7 +214,9 @@ window.__ModuleLoader__.load({
         showBlank: 'Show empty sessions',
         cleanupBlank: 'Clean up empty sessions ({n})',
         cleanupBlankHint: 'Permanently delete archived empty sessions; unarchived empty sessions must be archived first.',
-        blankActiveHint: '{n} unarchived empty sessions must be archived before cleanup.',
+        cleanupBlankLockedHint: '{n} archived empty sessions are open in this DSH process; restart DSH before cleaning them up.',
+        archiveBlank: 'Archive empty sessions ({n})',
+        archiveBlankHint: 'Archive every unarchived empty session in one batch; they can then be cleaned up with "Clean up empty sessions".',
         hiddenBlankCount: '{n} empty sessions hidden',
         selectAll: 'Select all shown',
         expandAll: 'Expand all',
@@ -356,10 +360,13 @@ window.__ModuleLoader__.load({
 
     const CSS = `
 .dsm-page{display:flex;flex-direction:column;gap:12px;font:inherit;color:var(--dsw-alias-label-primary);min-width:0}
-.dsm-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+/* Page head: title and its actions share the first row; the subtitles use the
+   full width below, so the buttons sit in the top-right corner. */
+.dsm-head{display:flex;flex-direction:column;gap:2px;min-width:0}
+.dsm-head-row{display:flex;align-items:center;justify-content:flex-start;gap:12px;flex-wrap:wrap;min-width:0}
 .dsm-title{margin:0;font-size:17px;font-weight:600;line-height:24px}
 .dsm-sub{margin:2px 0 0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
-.dsm-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dsm-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto}
 .dsm-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:28px;padding:0 10px;
  border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:transparent;color:var(--dsw-alias-label-primary);
  font:inherit;font-size:12px;line-height:18px;cursor:pointer;white-space:nowrap}
@@ -387,6 +394,12 @@ window.__ModuleLoader__.load({
 .dsm-note.warn{border-color:var(--dsw-alias-state-warn-primary)}
 .dsm-note-actions{display:flex;gap:6px;flex-wrap:wrap;flex:0 0 auto}
 .dsm-note detail{flex:1 1 100%}
+/* Operation-result toast: floats above the pane so scrolling never hides it. */
+.dsm-toast{position:fixed;bottom:18px;right:18px;z-index:1200;width:max-content;
+ max-width:min(460px,calc(100vw - 36px));padding:10px 12px;border-radius:8px;
+ background:var(--dsw-alias-bg-layer-2);box-shadow:0 14px 40px rgba(0,0,0,.45);
+ animation:dsm-toast-in .16s ease-out}
+@keyframes dsm-toast-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .dsm-sticky{position:sticky;top:0;z-index:3;display:flex;flex-direction:column;gap:8px;
  padding:6px 0 8px;background:var(--dsw-alias-bg-layer-2);border-bottom:1px solid var(--dsw-alias-border-l1)}
 .dsm-batch{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border-radius:7px;
@@ -438,7 +451,10 @@ window.__ModuleLoader__.load({
 .dsm-empty{padding:22px 10px;text-align:center;font-size:12px;color:var(--dsw-alias-label-secondary);
  border:1px dashed var(--dsw-alias-border-l2);border-radius:8px}
 .dsm-detail{display:flex;flex-direction:column;gap:12px}
-.dsm-detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}
+/* The title row and its actions stay in view while the detail page scrolls. */
+.dsm-detail-head{position:sticky;top:0;z-index:2;display:flex;align-items:flex-start;justify-content:space-between;
+ gap:10px;flex-wrap:wrap;padding:6px 0 8px;background:var(--dsw-alias-bg-layer-2);
+ border-bottom:1px solid var(--dsw-alias-border-l1)}
 .dsm-detail-title{margin:0;font-size:16px;line-height:23px;font-weight:600;word-break:break-word}
 .dsm-card{border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1);padding:10px}
 .dsm-card h3{margin:0 0 8px;font-size:12px;line-height:18px;font-weight:600}
@@ -655,11 +671,33 @@ window.__ModuleLoader__.load({
       return h('span', null, h('span', { className: 'dsm-spin', 'aria-hidden': 'true' }), ' ', label ?? t('working'))
     }
 
+    /** How long a plain success toast stays before hiding itself. */
+    const NOTICE_HIDE_MS = 5000
+
+    /**
+     * Operation-result toast.
+     *
+     * It floats above the settings pane (instead of sitting in the scroll flow),
+     * so a result is visible no matter where the list is scrolled. A plain
+     * success toast hides itself after a few seconds; failures and notices with
+     * an action stay until the user dismisses them, because they carry details
+     * worth reading.
+     */
     function Notice({ notice, t, onDismiss }) {
+      const dismiss = React.useRef(onDismiss)
+      dismiss.current = onDismiss
+      const transient = notice !== null && notice !== undefined
+        && notice.tone !== 'error' && notice.tone !== 'warn'
+        && notice.details === undefined && notice.action === undefined
+      React.useEffect(() => {
+        if (!transient) return undefined
+        const timer = setTimeout(() => dismiss.current?.(), NOTICE_HIDE_MS)
+        return () => clearTimeout(timer)
+      }, [notice, transient])
       if (notice === null || notice === undefined) return null
       return h(
         'div',
-        { className: `dsm-note ${notice.tone ?? ''}`, role: 'status' },
+        { className: `dsm-note dsm-toast ${notice.tone ?? ''}`, role: 'status' },
         h('div', { style: { flex: '1 1 auto', minWidth: 0 } },
           h('div', null, notice.text),
           notice.detail ? h('div', { className: 'dsm-hint', style: { marginTop: 3 } }, notice.detail) : null,
@@ -982,30 +1020,44 @@ window.__ModuleLoader__.load({
     // Delete scope (shared by single and batch)
     // ---------------------------------------------------------------------
 
-    function DeleteScope({ ctx, t, ids, onConfirmed, onCancel, busy }) {
+    function DeleteScope({ ctx, t, ids, maxBatch, onConfirmed, onCancel, busy }) {
       const [phase, setPhase] = React.useState('loading')
       const [preview, setPreview] = React.useState(null)
       const [error, setError] = React.useState(null)
       const [checked, setChecked] = React.useState(false)
       const idsKey = ids.join('\u0000')
 
+      // One confirmation may name more sessions than a single request admits
+      // (the empty-session shortcut does). Preview in batches and merge the
+      // scopes so the dialog still shows one combined result.
       React.useEffect(() => {
         const controller = new AbortController()
         setPhase('loading')
         setChecked(false)
-        post('delete/preview', { sessionIds: ids }, controller.signal)
-          .then((value) => {
+        const size = Number.isFinite(maxBatch) && maxBatch > 0 ? maxBatch : 50
+        const merge = async () => {
+          const merged = { roots: [], errors: [], sessions: [], descendantCount: 0, forkChildren: [], totalBytes: 0 }
+          for (let index = 0; index < ids.length; index += size) {
+            const value = await post('delete/preview', { sessionIds: ids.slice(index, index + size) }, controller.signal)
             if (controller.signal.aborted) return
-            setPreview(value)
-            setPhase('ready')
-          })
-          .catch((failure) => {
-            if (failure?.name === 'AbortError') return
-            setError(errorText(t, failure))
-            setPhase('error')
-          })
+            merged.roots.push(...(value?.roots ?? []))
+            merged.errors.push(...(value?.errors ?? []))
+            merged.sessions.push(...(value?.sessions ?? []))
+            merged.descendantCount += value?.descendantCount ?? 0
+            merged.forkChildren.push(...(value?.forkChildren ?? []))
+            merged.totalBytes += value?.totalBytes ?? 0
+          }
+          if (controller.signal.aborted) return
+          setPreview(merged)
+          setPhase('ready')
+        }
+        merge().catch((failure) => {
+          if (failure?.name === 'AbortError') return
+          setError(errorText(t, failure))
+          setPhase('error')
+        })
         return () => controller.abort()
-      }, [idsKey, t])
+      }, [idsKey, maxBatch, t])
 
       React.useEffect(() => {
         const onKeyDown = (event) => {
@@ -1272,6 +1324,7 @@ window.__ModuleLoader__.load({
                     ctx,
                     t,
                     ids: deleteIds,
+                    maxBatch: state.limits?.maxBatch ?? 50,
                     busy,
                     onCancel: () => setShowDelete(false),
                     onConfirmed: (ids) => onDelete(ids),
@@ -1559,17 +1612,43 @@ window.__ModuleLoader__.load({
         return value
       }
 
+      /**
+       * Permanently delete sessions in backend-sized batches. One confirmation
+       * may cover more ids than a single request admits (the empty-session
+       * shortcut can), so the request is split and the totals are summed into
+       * one notice.
+       */
       const deleteRows = async (ids) => {
-        const value = await run(
-          () => post('delete', { sessionIds: ids, confirm: true }),
-          (result) => resultText(result),
-        )
-        if (value !== undefined) {
+        if (ids.length === 0) return undefined
+        const max = state?.limits?.maxBatch ?? 50
+        setBusy(true)
+        setNotice(null)
+        try {
+          let succeeded = 0
+          let failed = 0
+          const failures = []
+          for (let index = 0; index < ids.length; index += max) {
+            const value = await post('delete', { sessionIds: ids.slice(index, index + max), confirm: true })
+            succeeded += value?.totals?.succeeded ?? 0
+            failed += value?.totals?.failed ?? 0
+            for (const item of value?.results ?? []) if (item.ok === false) failures.push(item)
+          }
+          setNotice(
+            failed === 0
+              ? { tone: 'ok', text: t('batchDone', { ok: succeeded, failed: 0 }) }
+              : { tone: 'error', text: t('batchDone', { ok: succeeded, failed }), details: failures.slice(0, 20) },
+          )
           setBulkDeleteIds(null)
           setSelected(new Set())
           if (selectedId !== null && ids.includes(selectedId)) setSelectedId(null)
+          await load({ silent: true })
+          return { totals: { succeeded, failed } }
+        } catch (failure) {
+          setNotice({ tone: 'error', text: errorText(t, failure), detail: failure?.message })
+          return undefined
+        } finally {
+          setBusy(false)
         }
-        return value
       }
 
       const cleanupOrphans = async () => {
@@ -1585,6 +1664,40 @@ window.__ModuleLoader__.load({
             cleaned += Math.min(max, ids.length - index)
           }
           setNotice({ tone: 'ok', text: t('cleanedOrphans', { n: cleaned }) })
+          await load({ silent: true })
+        } catch (failure) {
+          setNotice({ tone: 'error', text: errorText(t, failure) })
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      /**
+       * Archive every unarchived empty session, in backend-sized batches. The
+       * user can then clean them up with one confirm dialog.
+       */
+      const archiveBlankSessions = async (ids) => {
+        if (ids.length === 0) return
+        const max = state?.limits?.maxBatch ?? 50
+        setBusy(true)
+        setNotice(null)
+        try {
+          let archived = 0
+          const failures = []
+          for (let index = 0; index < ids.length; index += max) {
+            const value = await post('archive', { sessionIds: ids.slice(index, index + max) })
+            archived += value?.totals?.succeeded ?? 0
+            for (const item of value?.results ?? []) if (item.ok === false) failures.push(item)
+          }
+          if (failures.length === 0) {
+            setNotice({ tone: 'ok', text: t('archiveDone', { n: archived }) })
+          } else {
+            setNotice({
+              tone: 'error',
+              text: t('batchDone', { ok: archived, failed: failures.length }),
+              details: failures.slice(0, 20),
+            })
+          }
           await load({ silent: true })
         } catch (failure) {
           setNotice({ tone: 'error', text: errorText(t, failure) })
@@ -1629,8 +1742,9 @@ window.__ModuleLoader__.load({
 
       const rowsForTabs = rows.filter((row) => showBlank || row.blank !== true)
       const blankRows = rows.filter((row) => row.blank === true)
-      const blankArchivedRows = blankRows.filter((row) => row.archived === true && row.can?.delete === true)
-      const blankActiveCount = blankRows.filter((row) => row.archived !== true || row.can?.delete !== true).length
+      const blankUnarchivedRows = blankRows.filter((row) => row.archived !== true)
+      const blankArchivedRows = blankRows.filter((row) => row.archived === true)
+      const blankDeletableRows = blankArchivedRows.filter((row) => row.can?.delete === true)
       const tabs = [
         { key: 'all', label: t('tabAll'), count: rowsForTabs.length },
         { key: 'active', label: t('tabActive'), count: rowsForTabs.filter((row) => !row.archived).length },
@@ -1731,38 +1845,48 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { className: 'dsm-head' },
-          h('div', null,
+          h(
+            'div',
+            { className: 'dsm-head-row' },
             h('h2', { className: 'dsm-title' }, t('pageTitle')),
-            h('p', { className: 'dsm-sub' }, t('pageSubtitle')),
-            h('p', { className: 'dsm-sub' },
-              t('totalLine', {
-                all: state.totals.all,
-                archived: state.totals.archived,
-                size: formatBytes(state.totals.bytes),
-              }),
-              blankRows.length > 0 && !showBlank
-                ? ` · ${t('hiddenBlankCount', { n: blankRows.length })}`
-                : '',
-              (state.totals?.hiddenSubagents ?? 0) > 0 && !includeSubagents
-                ? ` · ${t('hiddenSubagentCount', { n: state.totals.hiddenSubagents })}`
-                : '',
+            h('div', { className: 'dsm-head-actions' },
+              blankUnarchivedRows.length > 0
+                ? h('button', {
+                    type: 'button',
+                    className: 'dsm-btn',
+                    disabled: busy,
+                    title: t('archiveBlankHint'),
+                    onClick: () => void archiveBlankSessions(blankUnarchivedRows.map((row) => row.id)),
+                  }, t('archiveBlank', { n: blankUnarchivedRows.length }))
+                : null,
+              blankArchivedRows.length > 0
+                ? h('button', {
+                    type: 'button',
+                    className: 'dsm-btn',
+                    disabled: busy || blankDeletableRows.length === 0,
+                    title: blankDeletableRows.length === blankArchivedRows.length
+                      ? t('cleanupBlankHint')
+                      : t('cleanupBlankLockedHint', { n: blankArchivedRows.length - blankDeletableRows.length }),
+                    onClick: () => setBulkDeleteIds(blankDeletableRows.map((row) => row.id)),
+                  }, t('cleanupBlank', { n: blankArchivedRows.length }))
+                : null,
+              h('button', { type: 'button', className: 'dsm-btn', disabled: busy, onClick: () => void load({ silent: true }) },
+                busy ? h(Spinner, { t, label: t('working') }) : t('refresh')),
             ),
-            blankActiveCount > 0 && showBlank
-              ? h('p', { className: 'dsm-hint' }, t('blankActiveHint', { n: blankActiveCount }))
-              : null,
           ),
-          h('div', { className: 'dsm-head-actions' },
-            blankArchivedRows.length > 0
-              ? h('button', {
-                  type: 'button',
-                  className: 'dsm-btn',
-                  disabled: busy,
-                  title: `${t('cleanupBlankHint')}${blankActiveCount > 0 ? ` ${t('blankActiveHint', { n: blankActiveCount })}` : ''}`,
-                  onClick: () => setBulkDeleteIds(blankArchivedRows.map((row) => row.id)),
-                }, t('cleanupBlank', { n: blankArchivedRows.length }))
-              : null,
-            h('button', { type: 'button', className: 'dsm-btn', disabled: busy, onClick: () => void load({ silent: true }) },
-              busy ? h(Spinner, { t, label: t('working') }) : t('refresh')),
+          h('p', { className: 'dsm-sub' }, t('pageSubtitle')),
+          h('p', { className: 'dsm-sub' },
+            t('totalLine', {
+              all: state.totals.all,
+              archived: state.totals.archived,
+              size: formatBytes(state.totals.bytes),
+            }),
+            blankRows.length > 0 && !showBlank
+              ? ` · ${t('hiddenBlankCount', { n: blankRows.length })}`
+              : '',
+            (state.totals?.hiddenSubagents ?? 0) > 0 && !includeSubagents
+              ? ` · ${t('hiddenSubagentCount', { n: state.totals.hiddenSubagents })}`
+              : '',
           ),
         ),
         h(Notice, { notice, t, onDismiss: () => setNotice(null) }),
@@ -1932,6 +2056,7 @@ window.__ModuleLoader__.load({
               ctx,
               t,
               ids: bulkDeleteIds,
+              maxBatch: state.limits?.maxBatch ?? 50,
               busy,
               onCancel: () => setBulkDeleteIds(null),
               onConfirmed: (ids) => void deleteRows(ids),
