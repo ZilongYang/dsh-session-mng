@@ -1,6 +1,6 @@
 # dsh-session-mng 设计与实现说明
 
-> 对应版本 0.1.3，实测宿主 DSH 0.2.1-rc.3（Desktop `desktop` profile；0.2.1-rc.2 亦验证过）。本文面向代码评审与二次开发，记录可观察行为、事务边界、版本敏感点和已知限制。
+> 对应版本 0.2.0，实测宿主 DSH 0.2.1-rc.3（Desktop `desktop` profile；0.2.1-rc.2 亦验证过）。本文面向代码评审与二次开发，记录可观察行为、事务边界、版本敏感点和已知限制。
 
 ## 1. 设计约束
 
@@ -52,6 +52,14 @@
 | `POST /delete/preview` | 删除范围预览（根 + 子代理后代 + 分支提示） |
 | `POST /delete` | `{sessionIds, confirm:true}` |
 | `POST /move` | `{sessionIds, workspaceId}` |
+| `GET /overview?subagents=0\|1` | 首屏概览：工作区计数/归档/空会话、totals、orphans、capabilities、limits；**无会话行** |
+| `GET /sessions?workspaceId=&tab=&query=&sort=&offset=&limit=&subagents=&blank=&sizes=` | 单工作区一页（≤50 行）；branch-aware 排序 + `id` tie-break；`parentStub`/`branchDepth` |
+| `GET /search?query=&…` | 跨工作区标题/路径/id/父标题搜索，每命中组一页 + total |
+| `GET /session?id=` | 详情单行 |
+| `GET /blanks?subagents=` | 空会话三组 id 列表 |
+| `GET /sizes?workspaceId=all\|ungrouped\|<id>&subagents=` | 大小统计（一次 `sessionPersistence.list()` + 60 s TTL，只聚合可见行） |
+
+0.2.0 的读面全部是 GET；`/state` 保留给 0.1.x 客户端与老 Host 回退。参数校验失败/未知 workspace 走既有错误信封（`bad-request` / `workspace-not-found`），大小扫描失败返回 503 `sizes-pending`。
 
 所有 id 必须是 host 当前已知的会话 id；workspaceId 必须来自 `workspaceRegistry.list()`。批量上限：`maxBatch`（默认 50）/ `maxMoveBatch`（默认 20）；级联删除总上限 500。
 
@@ -224,4 +232,43 @@ targetDir  = dirname(locate({id, cwd: target.path}))
 - **批量操作**：只使用 `visibleRows` 中的已选行；`全选当前列表` 只选可见集；批量条提示“选择仅作用于当前筛选与展开结果”。
 - **吸附**：过滤工具栏与批量条包在同一个 `.dsm-sticky`（`position: sticky; top: 0`）中，滚动时整体吸在设置弹窗内容区顶部；批量条不再是独立 sticky。
 
-0.2.0 会把 `state` 拆成“工作区概览 + 按工作区分页 sessions”，`computeView` 的过滤/分组逻辑保留，但数据来源从全量数组改为服务端页 + 缓存。
+0.2.0 已把 `state` 拆成「工作区概览 + 按工作区分页 sessions」：过滤/排序/分页/分支嵌套在 Host 完成，客户端只保留组顺序、展开集合、选择集与渲染；老 Host 回退（`/state`）时仍由客户端 `computeView` 做每组 50 条本地窗口。详见第 14 节。
+
+## 14. 0.2.0 读取面与零 IO catalog
+
+目标：1000–10000 条会话时首屏与翻页都不再拉全量。
+
+### 14.1 数据来源（快路径）
+
+`lib/catalog.js#fromContext` 从两块宿主内存数据组装全部行：
+
+1. `workspaceRegistry.headers`：`Map<id, header>`，宿主启动时由 `sessionPersistence.list()` 一次性建好，含全部已存储会话的 parentSession/origin/delegationDepth/isSeeded/createdAt/cwd/agentPreset。插件**不额外读盘**。
+2. `sessionProjectionCache.cachedSnapshot(header)`：零 IO 返回 `title`、`sessionListMetadata{blank,lastPromptAt}`；live 会话用 `sessionProjections.cachedSnapshot(session)`。
+
+在此基础上合并 `ctx.sessions.list()`（live 会话）、`archivedSessionIds` / `pinnedSessionIds`、workspace 账本（`sessionIds` → cwd → ungrouped），计算三态分类与全域 `parentTitle` / `parentPresent` / `forkCount`。行字段与 0.1.x `/state` 兼容。
+
+两个 seam 都是版本敏感点：`headers` 必须是 Map、投影缓存服务可 `ctx.get('sessionProjectionCache')`。任一缺失时 `catalogAvailable()` 为 false，`service.catalogFor()` 走 `createLegacyCatalogCache`（`buildState` + 30 s TTL）；返回结构完全相同，只有 `source: "legacy"` 和成本不同。
+
+### 14.2 分页、排序与分支
+
+- 过滤：tab / workspaceId（或 ungrouped）/ query / blank / subagents 全部在 Host 完成；`showBlank=false` 时在分页前剔除空会话。
+- 排序：`updated`（`max(createdAt,lastPromptAt)`）/`created`/`title`/`size`，全部追加 `id` 升序 tie-break。
+- branch-aware：先排序，再用 `orderBranchRows` 把分支挂到父行之后（父不在过滤集则保持顶层），最后 `slice(offset, offset+limit)`。`total` 是过滤后的总数，`hasMore` 由此得出。
+- `parentStub`：fork 行的父不在当前页时下发 `{id,title,present}`，客户端据此区分「来自某父」与「父已不存在」；`forkCount` 始终是全域名额。
+- 标题：常规只读投影缓存；本页仍缺标题时，才对本页 ≤50 条做 2 s 预算的 `readTitleSnapshots` 兜底，仍缺失计入 `titlesPending`。
+
+### 14.3 大小
+
+- 页内：`readLogFacts` 用 `sessionPersistence.locate()` 推目录 + `currentLogFile`（readdir 选最高代）+ `stat`，只读本页文件；不用 `findSessionDirs`/`stat(id)`（miss 时会全库扫描）。
+- 总量：`GET /sizes` 一次 `sessionPersistence.list()`（并发 3），聚合 **catalog 可见行**（随 `subagents` 开关），进程内 TTL 60 s；归档/恢复/移动/删除/改标题后失效。`sizeScanMax` 超出时返回 `sizes-pending` 降级。
+- 客户端首屏不等待大小：先渲染计数，`/sizes` 后台返回后补「总大小/组大小」，失败显示「—」。
+
+### 14.4 进程内存记账
+
+- `deletedIds`：本进程删除后注册表 header 缓存仍可能保留到重启；删除成功后记账并从 catalog 过滤，`/sizes` 对账时清理。
+- `titleOverrides`：冷会话 `title/apply` 后宿主投影缓存下次 fold 前可能仍是旧标题；写成功后记账优先使用，5 分钟 TTL + `/sizes` 对账收敛。
+- 幽灵行：外部删除由页内 stat（缺日志则不显示大小）与 `/sizes` 对账收敛，不追求跨进程实时一致。
+
+### 14.5 客户端
+
+`overview` 首屏 → 每个展开工作区一页 → 加载更多按 offset 追加；pages 缓存 + rowCache + scopeKey 失效；并发 3。搜索防抖后走 `/search`；选择只允许已加载且展开的行，scope 变化清空；详情用 `/session` 独立取数，不再因刷新清空；`window.focus` 只静默刷 overview。老 Host（`/overview` 404）一次性回退到 `/state`，保留每组 50 条本地窗口与「加载更多」。

@@ -155,3 +155,11 @@ curl -s https://awesome-dsh-plugin.com/plugins.json | grep -i session-mng
 - `npm publish`：`dsh-session-mng@0.1.4`，37 个文件，583.2 kB / unpacked 834.8 kB，shasum `aac611c2e007d45dda370c9b96337a914d300cda`；本次 registry 传播约 6 分钟，`latest` = 0.1.4，`dist.fileCount` = 37。
 - Git：main 已 push（功能提交 `0cf4d55`）；tag `v0.1.4`；Release https://github.com/ZilongYang/dsh-session-mng/releases/tag/v0.1.4
 - marketplace：条目不需要改 YAML，卡片版本随 npm 自动更新为 0.1.4。
+
+## 10. 0.2.0（2026-10-29，实现完成，待发布）
+
+0.2.0 是 Host 读面重构（overview + 分页 sessions + catalog），不属于市场条目变更：marketplace 只读 `package.json` 的 `repository`/版本，条目 YAML 不需要改；npm 发布后卡片版本自动更新。
+
+- 计划：[PLAN-2026-10-29.md](PLAN-2026-10-29.md)；发布清单：[RELEASE-CHECKLIST-0.2.0.md](RELEASE-CHECKLIST-0.2.0.md)。
+- 本地：129 测试全绿；10k 合成基准 overview 9.5 ms / 1338 B、单页 8.8 ms / 25.3 KB；`npm pack --dry-run` 41 文件 / 628.2 kB。
+- 待执行：Desktop 重启后的实机只读验收、截图重拍、`npm publish`、tag `v0.2.0`、GitHub Release、市场卡片版本确认（应自动变为 0.2.0）。

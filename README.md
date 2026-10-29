@@ -18,7 +18,8 @@
 
 - **统一会话总览**：按工作区分组列出当前 profile 的全部会话（活跃 + 已归档）。显示标题、路径、会话 id、大小、最后活动时间、运行/已打开/已归档/已置顶/分支/子代理标记；支持搜索、工作区筛选、排序、刷新、批量选择。
 - **分支会话默认显示**：从某条会话分出来的会话（fork）和主会话一样可见、可管理——缩进挂在父会话下方，父行显示「N 分支」，分支行标注「↳ 来自：父标题」；搜索父标题也能找到它。由委派产生的**子代理会话**仍默认隐藏（勾选「显示子代理会话」查看），总览行会提示「已隐藏 N 个子代理会话」。
-- **工作区优先 + 分页**：会话数 >100 时默认折叠工作区；每个工作区默认 50 条，「加载更多」继续展开；搜索自动展开命中工作区。过滤工具栏和批量条整体吸顶。
+- **按工作区分页（Host 侧）**：首屏只取工作区概览（会话数/归档数/空会话数/大小占位），展开工作区才按 50 条一页向宿主取行，「加载更多」继续追加；会话数 >100 时默认折叠工作区；搜索自动展开命中工作区。过滤工具栏和批量条整体吸顶。
+- **万级会话可用**：Host 新增零会话日志 IO 的 catalog（复用宿主的 header 索引与投影缓存），10000 条会话首屏 overview 约 10 ms / 约 1.3 KB，单页 50 行约 9 ms；`GET /state` 保留给 0.1.x 客户端与回退路径。
 - **选择跟随可见集**：切换筛选/折叠/搜索/刷新后，隐藏会话自动取消选择；`全选当前列表` 只作用于当前筛选与已展开的工作区。
 - **空会话默认隐藏**：侧栏本来就不显示的 `blank` 会话，会话管理默认也不显示；勾选「显示空会话」才出现。提供「清理空会话（N）」快速清理已归档空会话。
 - **删除范围模态确认**：范围内容在弹窗内独立滚动，底部勾选与确认/取消按钮固定可见；支持遮罩点击/Esc 取消。
@@ -73,17 +74,23 @@ Host 半是进程内模块：装完如果看不到页面，重启一次 dsh/应�
 
 ```
 Settings page (client.js)
-      │  GET  /session-mng/api/state
+      │  GET  /session-mng/api/overview                 ← 首屏：只有计数，没有会话行
+      │  GET  /session-mng/api/sessions?...             ← 每个展开的工作区一页（≤50 行）
+      │  GET  /session-mng/api/{search,session,blanks,sizes}
+      │  GET  /session-mng/api/state                    ← 0.1.x 兼容 / 老 Host 回退
       │  POST /session-mng/api/{preview,title/propose,title/apply,archive,unarchive,delete/preview,delete,move}
       ▼
 Host route (lib/api.js) ──► service (lib/service.js)
-      ├─ state        : sessionController/sessionQuery + workspaceRegistry + sessionPersistence
+      ├─ catalog      : workspaceRegistry.headers + sessionProjectionCache（零会话日志 IO；seam 缺失回退 buildState 慢路径）
+      ├─ state        : buildState 慢路径 / sessionController + sessionQuery + workspaceRegistry + sessionPersistence
       ├─ title        : sessionQuery.readSurface → ctx.llm.stream → 确认后写 session/title 事件
       ├─ archive      : workspaceRegistry.archiveSession / unarchiveSession
       ├─ move         : 日志 header cwd 重写 + 目录迁移 + workspace 缓存对账（失败全回滚）
       └─ delete       : 删除范围预览 → 目录移入临时区 → 清理账本 → 删除（失败回滚）
 ```
 
+- **首屏是概览、行是分页**：`overview` 只聚合内存索引；`sessions` 每页最多 50 行，排序/分支嵌套在 Host 完成后再切片，`id` tie-break 保证翻页稳定。
+- **catalog 不落盘、不缓存会话**：行从宿主已有的 header 索引与投影缓存读取；归档/移动/删除/改标题后只失效大小快照与慢路径缓存，下一次请求自然重建。
 - **标题是日志事件**：`session/title` 的 `source` 为 `user`，与官方重命名一致；已归档会话不需要恢复 Agent。
 - **工作区归属是派生的**：由会话 header 的 `cwd` 决定。移动必须改写 header，只改账本无效。
 - **不碰事件正文**：移动只重写日志第一个 frame（header），其余字节原样保留；移动后重新完整 replay 校验一次。
@@ -99,7 +106,7 @@ Host route (lib/api.js) ──► service (lib/service.js)
 | 会话后端 | 移动/删除只支持本地 JSONL 后端（`sessionPersistence.locate`）；其他后端仍可用总览/标题/归档/恢复 |
 | 官方依赖 | 无 runtime 依赖；只使用 `ctx` 服务 |
 | 已知限制 | 已打开（live）会话不能移动或彻底删除，重启 DSH 后重试；有子代理后代的会话不能单独移动；子代理会话默认隐藏（可勾选「显示子代理会话」查看）；分支会话默认显示，但暂不能单独移动（需与父会话留在同一工作区）；删除父会话不级联普通分支，分支会失去来源标识（显示「来源父会话已不存在」） |
-| 规模限制 | 0.1.1 的折叠/分页只在客户端压 DOM，`state` 仍一次拉全量（202 条约 103 KB；10000 条约 5 MB）。Host 侧 overview + paged sessions 是 0.2.0 的主任务 |
+| 规模限制 | 首屏与分页行走 Host catalog，不拉全量行；单页上限 50。**大小**按需异步统计（`/sizes` 复用一次 `sessionPersistence.list()`，10000 条约数秒），首屏/分页不依赖它。依赖宿主的两个内存 seam（`workspaceRegistry.headers`、`sessionProjectionCache`），缺失时自动退回 0.1.x 的 `buildState` 慢路径 |
 
 ### 版本敏感点（请读）
 
@@ -125,6 +132,9 @@ Host route (lib/api.js) ──► service (lib/service.js)
     titleMaxBytes: 120
     allowRemote: false      # 默认只接受 loopback / webRuntime.trustedHosts
     sessionsRoot: ''        # 仅在 sessionPersistence.locate 缺失时作为定位兜底
+    pageLimitMax: 50        # /sessions 单页上限（1–200）
+    sizesTtlMs: 60000       # /sizes 全量大小快照的进程内 TTL（1s–1h）
+    sizeScanMax: 20000      # /sizes 最多统计的会话数，超出返回 sizes-pending 降级
 ```
 
 ## 安全边界
@@ -137,7 +147,7 @@ Host route (lib/api.js) ──► service (lib/service.js)
 ## 开发
 
 ```sh
-npm test                      # node --test，29 个单元/集成测试
+npm test                      # node --test，Host 单测 + 客户端 vm 测试
 node --check index.js client.js lib/*.js
 npm --cache /tmp/dsh-npm-cache pack --dry-run
 ```
@@ -146,16 +156,20 @@ npm --cache /tmp/dsh-npm-cache pack --dry-run
 
 ## 当前状态与下一步
 
+- `0.2.0`（本地实现与测试完成，待实机验收/发布）：Host 侧新增零会话日志 IO 的会话 catalog 与 7 条只读路由（`/overview`、`/sessions`、`/search`、`/session`、`/blanks`、`/sizes`，`/state` 保留）；首屏只取概览，工作区展开才按 50 条一页取行；搜索改由宿主完成；选择只作用于已加载行；详情独立取数不再被刷新踢出；分支跨页不再误报父会话已删除。10000 条合成基准：overview ≈ 10 ms / 1.3 KB，单页 50 行 ≈ 9 ms。129 个测试全绿（Host 72 + 客户端 vm 57）。
 - `0.1.4` 已发布到 npm / GitHub / Release：详情页标题行吸顶；操作结果改为浮动 toast（成功 5 秒自动消失）；头部按钮移到标题右侧；新增「归档空会话（N）」，「清理空会话（N）」只要有已归档空会话就显示，且超过 50 条自动分批预览/删除。
 - `0.1.3` 已发布到 npm / GitHub / Release：三态会话模型（根/分支/子代理），分支默认显示并缩进在父会话下；删除父会话不再级联删掉普通分支；父会话有历史分支时也能移动；兼容声明增加 DSH `0.2.1-rc.3`。
 - `0.1.2` 已发布：空会话默认隐藏、清理空会话、删除范围模态确认。
-- 29 个测试全绿；0.1.4 包 37 个文件 / 583.2 kB（unpacked 834.8 kB）。
+- 129 个测试全绿；0.2.0 包 41 个文件 / 628.2 kB（unpacked 978.2 kB）。
 - 市场条目已收录：PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 已于 2026-10-27 合并（`check` 与仓库年龄 gate 均通过）；卡片版本随 npm 自动更新，当前 0.1.4。
-- 下一项主任务：**0.2.0 Host 侧 overview + 分页 sessions**，为 1000–10000 条会话设计；详细任务、验收标准、环境坑见 [接手说明](docs/HANDOVER-2026-10-27.md)。
+- 下一项主任务见 [接手说明（0.2.0 之后）](docs/HANDOVER-2026-10-29.md)：先完成 0.2.0 的实机只读验收与发版，再安排全文内容搜索、导出、置顶等候选。
 
 ## 文档索引
 
-- [接手说明（下一步任务）](docs/HANDOVER-2026-10-27.md)
+- [接手说明（2026-10-27）](docs/HANDOVER-2026-10-27.md)
+- [接手说明（0.2.0 之后）](docs/HANDOVER-2026-10-29.md)
+- [0.2.0 实施计划（overview + 分页 sessions）](docs/PLAN-2026-10-29.md)
+- [0.2.0 发布检查清单](docs/RELEASE-CHECKLIST-0.2.0.md)
 - [实施计划（批准时原样归档）](docs/PLAN-2026-10-26.md)
 - [0.1.0 发布检查清单](docs/RELEASE-CHECKLIST-0.1.0.md)
 - [0.1.1 实施计划](docs/PLAN-2026-10-27.md)

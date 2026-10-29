@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.2.0 — 2026-10-29
+
+### Added
+
+- **Host 侧会话 catalog（零会话日志 IO）**：新增 `lib/catalog.js`，从宿主的 `workspaceRegistry.headers`（启动时已建好的全量 header 索引）与 `sessionProjectionCache`（title / `sessionListMetadata`）组装会话行，不再为总览调用 `sessionController.list()`、`sessionPersistence.list()` 或批量 `readTitleSnapshots()`。内部 seam 全部特性检测；缺失时自动回退到 0.1.x 的 `buildState` 慢路径（30 s TTL），接口形状不变。
+- **`GET /overview`**：首屏只返回工作区计数/归档计数/空会话计数、totals、orphans、capabilities、limits，**不含任何会话行**；10000 条会话的合成基准约 10 ms、payload 约 1.3 KB。
+- **`GET /sessions`**：按 `workspaceId` + `tab` + `query` + `sort` + `offset/limit`（≤50）分页；Host 端 branch-aware 排序（父行优先）+ `id` tie-break 保证分页稳定；对不在本页的分支返回 `parentStub`；页内只对 ≤50 条日志做一次 readdir+stat 取大小。
+- **`GET /search`**：跨工作区的标题/路径/id/父标题搜索（与 0.1.3 的搜索口径一致），一次请求返回每个命中工作区的 `total` 与首屏一页，供客户端自动展开。
+- **`GET /session` / `GET /blanks` / `GET /sizes`**：详情单行、空会话 id 列表、按工作区/全局大小统计；大小统计复用一次 `sessionPersistence.list()` 并做 60 s 进程内缓存。
+- **客户端两段式加载**：首屏 `overview` → 展开工作区时取第一页 → 「加载更多」按 offset 追加；每工作区页缓存 + 行缓存，请求并发上限 3，切换筛选/排序/搜索时按 scope 失效。
+- **老 Host 回退**：`GET /overview` 404 时一次性探测并回退到 `GET /state`（0.1.4 行为），旧 Host + 新 Client 仍可用；`GET /state` 本身保持不变。
+- **配置项**：`sizesTtlMs`（默认 60000）、`sizeScanMax`（默认 20000）、`pageLimitMax`（默认 50）。
+
+### Changed
+
+- **列表默认每工作区 50 条改由 Host 分页**：客户端不再持有全量行；组头计数与「剩余 N 条」来自 Host 的 `total`，组大小异步取自 `/sizes`（未到达时显示「—」）。
+- **搜索改为宿主搜索**：输入防抖 250 ms 后请求 `/search`，命中工作区自动展开；搜索期间仍锁定折叠与「展开全部/收起全部」。
+- **选择语义收紧**：只允许选择已加载且已展开的行；切换 tab/工作区/搜索/排序/开关会清空选择；「全选当前列表」只作用于已加载可见行，并提示另有 N 条未加载；批量提交前再次过滤未加载 id（数据安全）。
+- **分支跨页展示**：父会话不在本页时不再误报「来源父会话已不存在」——有 `parentStub` 时显示「↳ 来自：父标题」，仅 Host 确认父不存在时才显示原提示；`forkCount` 始终是全域名额。
+- **详情页独立取数**：进入详情先用行缓存立即渲染，再由 `GET /session` 补齐；刷新不会再因为「不在当前列表数据里」把详情踢回列表。
+- **刷新策略**：写操作与「刷新」按钮改为刷新 overview + 按已加载深度重取当前展开工作区的页，保留选择与滚动位置；窗口重新获得焦点时只静默刷新 overview，不再全量重取。
+
+### Fixed
+
+- **排序键相同时行序不稳定**：`updated/created/size/title` 四种排序全部补 `id` 升序 tie-break，分页切片不再重复/漏行。
+- **切换排序不重置分页与选择裁剪**：`sort` 纳入分页 limit 重置与选择裁剪的依赖键，修掉 0.1.x 遗留的失效漏项。
+- **空会话 / orphan / 计数在分页后失真**：tabs 计数、hiddenBlankCount、hiddenSubagents、orphan 横幅与两个空会话按钮全部改为读 overview / `/blanks`，不再由「已加载行」推算。
+- **老 Host 回退丢失每工作区分页**：回退 `/state` 时仍按每组 50 条渲染 + 「加载更多」，不一次性铺满整组。
+
+### Compatibility
+
+- 实测宿主 DSH `0.2.1-rc.2` / `0.2.1-rc.3`；`GET /state` 保留，0.1.x 客户端不受影响。
+- 快速路径依赖的两个宿主内存 seam（`workspaceRegistry.headers`、`sessionProjectionCache`）仍属版本敏感点，已全部特性检测并保留慢路径兜底。
+
 ## 0.1.4 — 2026-10-28
 
 ### Fixed

@@ -1,6 +1,6 @@
 # Roadmap
 
-> 当前：`0.1.4` 已发布（npm latest / tag `v0.1.4` / Release）：详情页吸顶、结果 toast、空会话归档/清理与分批删除。市场条目已收录（PR [#9672](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9672) 于 2026-10-27 合并）。下一项主任务是 0.2.0 的 Host 分页；详细接手任务见 [docs/HANDOVER-2026-10-27.md](docs/HANDOVER-2026-10-27.md)。
+> 当前：`0.2.0` 已在 `main` 实现并测试通过（Host overview + 分页 sessions + 客户端两段式），等待实机验收与发布；线上 npm `latest` 仍为 `0.1.4`。0.2.0 计划与验收见 [docs/PLAN-2026-10-29.md](docs/PLAN-2026-10-29.md) 与 [docs/RELEASE-CHECKLIST-0.2.0.md](docs/RELEASE-CHECKLIST-0.2.0.md)。下一任接手见 [docs/HANDOVER-2026-10-29.md](docs/HANDOVER-2026-10-29.md)。
 
 ## 0.1.0 — delivered
 
@@ -40,22 +40,23 @@
 - 头部三个按钮移到会话管理标题右侧；副标题与统计信息独占下方整行。
 - 空会话：「归档空会话（N）」一键分批归档；「清理空会话（N）」只要有已归档空会话就显示；删除范围预览与删除按 `maxBatch` 分批，超过 50 条也能一次确认完成。
 
-## 0.2.0 — next (planned)
+## 0.2.0 — implemented (awaiting publication)
 
-首要目标：真正支撑 1000–10000 条会话，不再首屏拉全量 `state`。实施前先写 `docs/PLAN-2026-10-28.md` 并获批准。
+首要目标：真正支撑 1000–10000 条会话，不再首屏拉全量 `state`。计划与实施记录见 [docs/PLAN-2026-10-29.md](docs/PLAN-2026-10-29.md)。
 
-- `GET /session-mng/api/overview`：只返回工作区计数/大小/归档数、totals、capabilities、orphans；不读全部标题/日志。
-- `GET /session-mng/api/sessions`：按 `workspaceId/tab/offset/limit/query/sort` 分页；只对当前页 id 读标题/大小；返回 `hasMore`。
-- 未分组会话懒加载 + 短 TTL 缓存；全局搜索先只读验证宿主 search 是否覆盖标题。
-- Client：overview 首屏 → 工作区展开时取第一页 → 加载更多；保留 sticky、选择裁剪、搜索自动展开。
-- 兼容：保留 `/state` 给 0.1.x 客户端；Host 同时提供新旧接口。
-- 验收：合成 10k 数据首屏不返回 session rows；单页 ≤50 行；不触发全量 `sessionController.list`；现有 26 测试 + 新增分页/overview/search 测试。
-- 详细接口建议、验收与坑：[docs/HANDOVER-2026-10-27.md](docs/HANDOVER-2026-10-27.md)。
+- **零 IO catalog**：`lib/catalog.js` 从 `workspaceRegistry.headers` + `sessionProjectionCache` 组装行；两个内部 seam 特性检测，缺失回退 `buildState` 慢路径。
+- `GET /overview`：工作区计数/归档数/空会话/totals/capabilities/orphans，无会话行；10k 合成约 9.5 ms / 1.3 KB。
+- `GET /sessions`：按 `workspaceId/tab/query/sort/offset/limit` 分页（≤50 行），branch-aware 排序 + `id` tie-break + `parentStub`；10k 单页约 8.8 ms / 25 KB，不触发全量扫描。
+- `GET /search` / `/session` / `/blanks` / `/sizes`：跨工作区标题搜索、详情单行、空会话 id、按工作区/全局大小（一次 `persistence.list()` + 60 s TTL，只聚合可见行）。
+- Client 两段式加载：overview → 展开取页 → 加载更多；搜索防抖走宿主；选择只作用于已加载行；详情独立取数；老 Host 回退 `/state` 并保留每组 50 条本地分页。
+- 兼容：`GET /state` 保留；0.1.x 客户端不受影响。
+- 验收：129 测试全绿（Host 72 + 客户端 vm 57）；10k 基准不调用 `persistence.list` / `sessionController.list` / 批量 `readTitleSnapshots`。实机验收与发版待执行，见 [docs/RELEASE-CHECKLIST-0.2.0.md](docs/RELEASE-CHECKLIST-0.2.0.md)。
 
 ## Later candidates
 
 - 侧栏会话「...」菜单快捷入口（生成标题 / 会话管理详情），复用同一套 Host 操作。
-- 内容全文搜索（复用 `sessionQuery.searchSessions` / `searchEvents`），不只按标题/路径/id。
+- 内容全文搜索（本部署宿主 FTS 默认关闭且索引不含标题；接入前先确认 composition 与结果模型）。
+- `(sortValue,id)` keyset 游标，替换 0.2.0 的裸 offset 分页，进一步抗数据变化。
 - 导出所选会话为 Markdown / JSON（删除前的安全网；批量）。
 - 置顶 / 取消置顶（`workspaceRegistry.pinSession` / `unpinSession`）。
 - 整枝移动（父会话 + 分支会话 + 子代理后代一起迁移），或在移动时保留父链接。
