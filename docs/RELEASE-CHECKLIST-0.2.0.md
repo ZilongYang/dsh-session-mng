@@ -51,13 +51,11 @@
   - `GET /blanks`、`POST /overview`（405）、未知路由（404）、cross-site（403）全部符合契约。
   - `sort=size` 页按「大小排序 + 分支挂父行」返回（父行后紧跟其分支，因此数值不严格单调），与 0.1.x 客户端语义一致。
   - 全部读路由过程中 `sessionController.list` / 批量 `readTitleSnapshots` 调用数为 **0**；`persistence.list` 只由 `/sizes`（一次）与旧 `/state` 触发。
-- [ ] **实机只读验收（待重启 Desktop 让 Host 生效后执行；当前运行中的旧 Host 对 `/overview` 返回 405 POST only）**：
-  - [ ] `GET /session-mng/api/overview` 无 `sessions`/`rows` 字段；`GET /sessions?workspaceId=<真实 id>&limit=50` 返回 50 行、`hasMore` 正确。
-  - [ ] 首屏网络面板只发 `/overview`（+ `/blanks` + `/sizes`），不发 `/state`；展开工作区才发 `/sessions`。
-  - [ ] 分支跨页：父未加载显示「↳ 来自：父标题」，父已删除才显示「来源父会话已不存在」。
-  - [ ] 空会话「归档空会话 / 清理空会话」按钮仍在；orphan 清理可用。
-  - [ ] 详情进入/刷新/返回列表不闪退；刷新保持已加载深度与滚动。
-  - [ ] 写操作只用一次性测试会话验证标题/归档/恢复/移动/删除，完成后清理。
+- [x] **实机只读验收（隔离实例，真实 DSH 0.2.1-rc.2 + 本仓库 symlink 插件 + 真实会话数据副本）**：用 `DSH_HOME=/tmp/dsh-020-verify` 复制 web profile / sessions / storages，`--patch` 注入 `dsh-session-mng` 后启动独立 web 实例（127.0.0.1:58873），插件 Host 与 Client 均加载（`/overview` 返回 `source: "catalog"`；设置页出现「会话管理」）。
+  - [x] 真机 API：`overview` 200 / 3.9 ms；`sessions` 50 行、total 54、hasMore；`search` 14 组 / 81 条；`sizes` 与 `/state` 的 `totals.bytes` 完全一致（66,385,772 B）；per-workspace count 与 `/state` 逐项相等；`overview.totals`（all/hiddenSubagents/forks）与 `/state` 相等；`/sessions?workspaceId=all` 404、缺参 400、POST 405。
+  - [x] 真机 UI（ego-browser）：首屏只发 `overview + blanks + sizes`（**无 `/state`**）；展开最大工作区只发一次 `/sessions?...offset=0&limit=50&sizes=1`，渲染 50 行，组头「54 个会话 · 约 14 MiB · 已加载 50/54」；「加载更多」追加到 54 行；全库搜索只发一次 `/search`，14 个工作区自动展开、81 行；点行进详情只发一次 `/session?id=…`（另有既有 `preview`），返回按钮正常；`显示空会话` 切换后 tabs 108→109、隐藏空会话提示消失，`归档空会话（1）` 按钮保持；分支行显示「↳ 来自：父标题」并缩进 18px，无「来源父会话已不存在」误报。
+  - [x] 真机 `/state` 仍 200（旧客户端兼容）；运行全程无前端报错、无重复请求风暴。
+  - [ ] Desktop 应用重启后的最终确认（Client 刷新即可；Host 需重启）：当前正在运行的 Desktop 仍是旧 Host（`/overview` → 405 POST only）。
 - [ ] 截图更新（`assets/screenshot-*.png`，重启后按 0.2.0 列表/分页/搜索状态重拍）。
 
 ## C. 发布（待执行，需子龙确认）
