@@ -35,7 +35,13 @@
 - [x] 10k 合成基准（fake ctx，10k 会话 / 6 工作区，5 次均值）：`/overview` **9.5 ms / 1338 B**、`/sessions` 单页 **8.8 ms / 50 行 / 25.3 KB**；`persistence.list`、`sessionController.list`、批量 `readTitleSnapshots` 调用数均为 **0**。
 - [x] `npm --cache /tmp/dsh-npm-cache pack --dry-run`：41 个文件 / 628.2 kB（unpacked 978.2 kB）。
 - [x] 老 Host 回退、`sizes-pending` 降级、搜索组级过滤、legacy 分页均有单测/harness 覆盖。
-- [ ] **实机只读验收（待重启 Desktop 后执行）**：
+- [x] **真实数据离线校验（用本机 241 条 header / 13 工作区 / 409 条投影缓存构造 fake host，调用真实 service）**：
+  - `overview.source=catalog`，`totals.all=108` + `hiddenSubagents=133` = 241 条 header；无 `rows/sessions` 字段；`persistence.list` / `sessionController.list` / 批量 `readTitleSnapshots` 调用 **0**。
+  - 最大工作区页：`total=54`、本页 50 行、`hasMore=true`、50/50 行有大小、44 行有标题（6 行走 pending，真机由 2s 兜底补齐）；全程 0 次 O(n) 调用。
+  - `/search`：14 个命中组（13 工作区 + ungrouped）、total 81；`/blanks` 与投影缓存真值一致。
+  - `/sizes`：`subagents=0` → 66,169,650 B / 108 行；`subagents=1` → 83,384,681 B / 241 行，均与独立计算的 Σ 完全一致，仅 1 次 `persistence.list()`。
+  - 脚本在 `/tmp/verify-real-catalog.mjs`（只读，不落仓库）。
+- [ ] **实机只读验收（待重启 Desktop 让 Host 生效后执行）**：
   - [ ] `GET /session-mng/api/overview` 无 `sessions`/`rows` 字段；`GET /sessions?workspaceId=<真实 id>&limit=50` 返回 50 行、`hasMore` 正确。
   - [ ] 首屏网络面板只发 `/overview`（+ `/blanks` + `/sizes`），不发 `/state`；展开工作区才发 `/sessions`。
   - [ ] 分支跨页：父未加载显示「↳ 来自：父标题」，父已删除才显示「来源父会话已不存在」。
