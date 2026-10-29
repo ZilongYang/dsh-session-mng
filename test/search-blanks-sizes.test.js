@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { createService, DEFAULT_CONFIG, normalizeConfig } from '../lib/service.js'
+import { buildState } from '../lib/state.js'
 
 /** One projection-cache block the host would serve for a header. */
 function block(title, blank, lastPromptAt) {
@@ -41,7 +42,9 @@ function makeHost(options = {}) {
     })
     const values = { title: spec.title ?? '', sessionListMetadata: { blank: spec.blank === true, lastPromptAt: spec.updatedAt ?? spec.createdAt } }
     snapshots.push({
-      header: { id: spec.id, createdAt: spec.createdAt, cwd: spec.cwd },
+      // Faithful to the host: `persistence.list()` returns the full stored
+      // header, lineage fields included.
+      header: headers.get(spec.id),
       sizeBytes: spec.sizeBytes ?? 0,
       formatStatus: 'current',
     })
@@ -217,9 +220,11 @@ test('sizes aggregates by workspace and scope, and a warm scan is reused', async
   assert.equal(all.cached, false)
   assert.equal(all.scannedAt > 0, true)
   assert.equal(all.expiresAt, all.scannedAt + normalizeConfig({}).sizesTtlMs)
-  assert.deepEqual(all.total, { bytes: 1090, count: 8 })
+  // sub1 is a hidden delegation row: it is not a 0.1.4 listing row, so neither
+  // its bytes nor its count may appear here by default.
+  assert.deepEqual(all.total, { bytes: 1085, count: 7 })
   const byId = new Map(all.workspaces.map((workspace) => [workspace.id, workspace]))
-  assert.deepEqual(byId.get('a'), { id: 'a', title: 'A', path: '/a', bytes: 630, count: 5 })
+  assert.deepEqual(byId.get('a'), { id: 'a', title: 'A', path: '/a', bytes: 625, count: 4 })
   assert.deepEqual(byId.get('b'), { id: 'b', title: 'B', path: '/b', bytes: 410, count: 2 })
   assert.deepEqual(all.ungrouped, { bytes: 50, count: 1 })
 
@@ -228,7 +233,7 @@ test('sizes aggregates by workspace and scope, and a warm scan is reused', async
   assert.equal(host.counters.list, 1, 'a warm size snapshot must not rescan')
 
   const scoped = await service.sizes({ workspaceId: 'a' })
-  assert.deepEqual(scoped.total, { bytes: 630, count: 5 })
+  assert.deepEqual(scoped.total, { bytes: 625, count: 4 })
   assert.deepEqual(scoped.workspaces.map((workspace) => workspace.id), ['a'])
   assert.equal(scoped.workspaceId, 'a')
 
@@ -237,6 +242,48 @@ test('sizes aggregates by workspace and scope, and a warm scan is reused', async
   assert.deepEqual(ungrouped.workspaces, [])
 
   await assert.rejects(service.sizes({ workspaceId: 'ghost' }), (error) => error.code === 'workspace-not-found')
+})
+
+test('sizes count only catalog-visible rows and follow the subagents switch', async () => {
+  const { service, host } = makeService()
+  const hidden = await service.sizes({})
+  const shown = await service.sizes({ subagents: '1' })
+  assert.equal(host.counters.list, 1, 'both scopes reuse the same O(n) scan')
+
+  // Hidden by default: the delegation row is not a 0.1.x listing row and is
+  // not part of totals.bytes either.
+  assert.deepEqual(hidden.total, { bytes: 1085, count: 7 })
+  assert.deepEqual(hidden.workspaces.find((workspace) => workspace.id === 'a'), {
+    id: 'a',
+    title: 'A',
+    path: '/a',
+    bytes: 625,
+    count: 4,
+  })
+
+  // Asking for subagents adds exactly that one log, no other bytes change.
+  assert.deepEqual(shown.total, { bytes: 1090, count: 8 })
+  assert.deepEqual(shown.workspaces.find((workspace) => workspace.id === 'a'), {
+    id: 'a',
+    title: 'A',
+    path: '/a',
+    bytes: 630,
+    count: 5,
+  })
+
+  // Same fake ctx, same switch: the totals match what buildState reports.
+  const state = await buildState(host.ctx, normalizeConfig({}))
+  const stateWithSubagents = await buildState(host.ctx, normalizeConfig({}), { includeSubagents: true })
+  assert.equal(hidden.total.bytes, state.totals.bytes)
+  assert.equal(hidden.total.count, state.totals.all)
+  assert.equal(shown.total.bytes, stateWithSubagents.totals.bytes)
+  assert.equal(shown.total.count, stateWithSubagents.totals.all)
+
+  // And the count agrees with the overview the Client paints first.
+  const overview = await service.overview({})
+  assert.equal(hidden.total.count, overview.totals.all)
+  const overviewWithSubagents = await service.overview({ includeSubagents: true })
+  assert.equal(shown.total.count, overviewWithSubagents.totals.all)
 })
 
 test('the size TTL expires and mutations invalidate the snapshot', async () => {
