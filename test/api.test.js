@@ -15,6 +15,12 @@ function makeService(overrides = {}) {
     deletePreview: async () => ({ roots: [] }),
     remove: async () => ({ totals: {} }),
     move: async () => ({ totals: {} }),
+    overview: async () => ({ source: 'catalog', totals: {} }),
+    sessions: async () => ({ source: 'catalog', rows: [] }),
+    search: async () => ({ source: 'catalog', groups: [] }),
+    session: async () => ({ row: {} }),
+    blanks: async () => ({ unarchivedIds: [] }),
+    sizes: async () => ({ total: { bytes: 0 } }),
     ...overrides,
   }
 }
@@ -152,4 +158,114 @@ test('a service failure keeps its code and status', async () => {
   const result = await call(handler, mockRequest({ method: 'POST', url: '/session-mng/api/preview', body: '{}' }))
   assert.equal(result.status, 404)
   assert.deepEqual(result.body, { ok: false, error: { code: 'not-found', message: 'gone' } })
+})
+
+test('every 0.2.0 read route answers with the value envelope', async () => {
+  const calls = []
+  const record = (name) => async (params) => {
+    calls.push({ name, params })
+    return { route: name }
+  }
+  const handler = makeHandler({
+    service: makeService({
+      overview: record('overview'),
+      sessions: record('sessions'),
+      search: record('search'),
+      session: record('session'),
+      blanks: record('blanks'),
+      sizes: record('sizes'),
+    }),
+  })
+  const urls = [
+    ['overview', '/session-mng/api/overview?subagents=1'],
+    ['sessions', '/session-mng/api/sessions?workspaceId=a&tab=active&sort=title&offset=2&limit=10&subagents=1&blank=1&sizes=0'],
+    ['search', '/session-mng/api/search?query=alpha&limitPerGroup=5'],
+    ['session', '/session-mng/api/session?id=s1'],
+    ['blanks', '/session-mng/api/blanks?subagents=1'],
+    ['sizes', '/session-mng/api/sizes?workspaceId=all'],
+  ]
+  for (const [name, url] of urls) {
+    const result = await call(handler, mockRequest({ url }))
+    assert.equal(result.status, 200, `${name} status`)
+    assert.deepEqual(result.body, { ok: true, value: { route: name } }, `${name} envelope`)
+  }
+  assert.deepEqual(calls.map((entry) => entry.name), ['overview', 'sessions', 'search', 'session', 'blanks', 'sizes'])
+  assert.equal(calls[0].params.includeSubagents, true)
+  assert.deepEqual(calls[1].params, {
+    workspaceId: 'a',
+    tab: 'active',
+    sort: 'title',
+    offset: '2',
+    limit: '10',
+    subagents: '1',
+    blank: '1',
+    sizes: '0',
+    signal: calls[1].params.signal,
+  })
+  assert.equal(calls[2].params.query, 'alpha')
+  assert.equal(calls[3].params.id, 's1')
+  assert.equal(calls[4].params.includeSubagents, true)
+  assert.equal(calls[5].params.workspaceId, 'all')
+  assert.ok(calls[0].params.signal instanceof AbortSignal)
+})
+
+test('the legacy /state route is unchanged', async () => {
+  const calls = []
+  const handler = makeHandler({
+    service: makeService({
+      state: async (options) => {
+        calls.push(options)
+        return { hello: true }
+      },
+    }),
+  })
+  const bare = await call(handler, mockRequest({ url: '/session-mng/api' }))
+  assert.deepEqual(bare.body, { ok: true, value: { hello: true } })
+  const legacy = await call(handler, mockRequest({ url: '/session-mng/api/state?subagents=1' }))
+  assert.deepEqual(legacy.body, { ok: true, value: { hello: true } })
+  assert.equal(calls[0].includeSubagents, false)
+  assert.equal(calls[1].includeSubagents, true)
+})
+
+test('read routes reject the wrong method and unknown paths', async () => {
+  const handler = makeHandler()
+  const wrongMethod = await call(handler, mockRequest({ method: 'POST', url: '/session-mng/api/overview', body: '{}' }))
+  assert.equal(wrongMethod.status, 405)
+  assert.equal(wrongMethod.body.error.code, 'method-error')
+  const postOnSession = await call(handler, mockRequest({ method: 'POST', url: '/session-mng/api/session', body: '{}' }))
+  assert.equal(postOnSession.status, 405)
+  const unknownRead = await call(handler, mockRequest({ url: '/session-mng/api/nope' }))
+  assert.equal(unknownRead.status, 404)
+  assert.equal(unknownRead.body.error.code, 'not-found')
+})
+
+test('a read-route validation failure keeps its status and code', async () => {
+  const { SessionMngError } = await import('../lib/errors.js')
+  const handler = makeHandler({
+    service: makeService({
+      sessions: async () => {
+        throw new SessionMngError('workspace-not-found', 'unknown workspace "ghost"', 404)
+      },
+    }),
+  })
+  const result = await call(handler, mockRequest({ url: '/session-mng/api/sessions?workspaceId=ghost' }))
+  assert.equal(result.status, 404)
+  assert.deepEqual(result.body, {
+    ok: false,
+    error: { code: 'workspace-not-found', message: 'unknown workspace "ghost"' },
+  })
+})
+
+test('the fence protects the new read routes too', async () => {
+  const handler = makeHandler()
+  for (const url of ['/session-mng/api/overview', '/session-mng/api/sessions?workspaceId=a', '/session-mng/api/sizes']) {
+    const result = await call(handler, mockRequest({ url, headers: { host: 'evil.example' } }))
+    assert.equal(result.status, 403, url)
+    assert.equal(result.body.error.code, 'forbidden')
+  }
+  const crossSite = await call(
+    handler,
+    mockRequest({ url: '/session-mng/api/overview', headers: { origin: 'https://evil.example' } }),
+  )
+  assert.equal(crossSite.status, 403)
 })
