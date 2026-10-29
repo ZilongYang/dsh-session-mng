@@ -41,7 +41,17 @@
   - `/search`：14 个命中组（13 工作区 + ungrouped）、total 81；`/blanks` 与投影缓存真值一致。
   - `/sizes`：`subagents=0` → 66,169,650 B / 108 行；`subagents=1` → 83,384,681 B / 241 行，均与独立计算的 Σ 完全一致，仅 1 次 `persistence.list()`。
   - 脚本在 `/tmp/verify-real-catalog.mjs`（只读，不落仓库）。
-- [ ] **实机只读验收（待重启 Desktop 让 Host 生效后执行）**：
+- [x] **HTTP 级真实数据验收（真实 `createApiHandler` + fake host(241 header/13 工作区/409 投影缓存) + 真实 HTTP 请求）**：
+  - `GET /overview?subagents=0`：200 / 3.9 ms / 3.2 KB，`totals.all=108`、`hiddenSubagents=133`，无 `sessions/rows` 字段。
+  - `GET /sessions?workspaceId=<最大>&limit=50&sizes=1`：200 / 4.4 ms / 31.5 KB，50 行、`total=54`、`hasMore=true`、`titlesPending=6`；`offset=50` 返回剩余 4 行、`hasMore=false`。
+  - `GET /sessions?workspaceId=all` → 404 `workspace-not-found`；缺 `workspaceId` → 400 `bad-request`（与客户端「按组取页」契约一致）。
+  - `GET /search?query=session`：200 / 53 KB / 14 组 / total 81；空 query → 400；`query=x y` → 0 组。
+  - `GET /session?id=…`：200 / 2.8 ms / 850 B；未知 id → 404 `not-found`；缺 id、`../etc/passwd` → 400。
+  - `GET /sizes?subagents=0|1`：200 / ~1.8 ms，`{bytes:66,252,083,count:108}` / `{bytes:83,467,114,count:241}`，与 `/state` totals.bytes 同口径；未知 workspace → 404。
+  - `GET /blanks`、`POST /overview`（405）、未知路由（404）、cross-site（403）全部符合契约。
+  - `sort=size` 页按「大小排序 + 分支挂父行」返回（父行后紧跟其分支，因此数值不严格单调），与 0.1.x 客户端语义一致。
+  - 全部读路由过程中 `sessionController.list` / 批量 `readTitleSnapshots` 调用数为 **0**；`persistence.list` 只由 `/sizes`（一次）与旧 `/state` 触发。
+- [ ] **实机只读验收（待重启 Desktop 让 Host 生效后执行；当前运行中的旧 Host 对 `/overview` 返回 405 POST only）**：
   - [ ] `GET /session-mng/api/overview` 无 `sessions`/`rows` 字段；`GET /sessions?workspaceId=<真实 id>&limit=50` 返回 50 行、`hasMore` 正确。
   - [ ] 首屏网络面板只发 `/overview`（+ `/blanks` + `/sizes`），不发 `/state`；展开工作区才发 `/sessions`。
   - [ ] 分支跨页：父未加载显示「↳ 来自：父标题」，父已删除才显示「来源父会话已不存在」。
