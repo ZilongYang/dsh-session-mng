@@ -1370,16 +1370,11 @@ window.__ModuleLoader__.load({
       return out.length === rows.length ? out : rows
     }
 
-    /**
-     * Derive the filtered / grouped / rendered view for the list.
-     * Pure so the selection-pruning effect can use it before the loading guard.
-     */
-    function computeView({ state, tab, workspaceFilter, query, sort, expanded, defaultExpanded, limits, showBlank }) {
-      const rows = state?.sessions ?? []
-      const workspaceOrder = state?.workspaces ?? []
-      const text = query.trim().toLowerCase()
+    /** Tab / workspace / blank / text filter over one state's rows. */
+    function filterRows(rows, { tab, workspaceFilter, query, showBlank }) {
+      const text = (query ?? '').trim().toLowerCase()
       const filtering = text !== ''
-      const filtered = rows.filter((row) => {
+      return rows.filter((row) => {
         if (tab === 'active' && row.archived) return false
         if (tab === 'archived' && !row.archived) return false
         if (workspaceFilter === 'ungrouped' && row.workspaceId !== null) return false
@@ -1391,20 +1386,37 @@ window.__ModuleLoader__.load({
         }
         return true
       })
-      const sorted = [...filtered].sort((left, right) => {
-        if (sort === 'created') return right.createdAt - left.createdAt
-        if (sort === 'size') return right.sizeBytes - left.sizeBytes
-        if (sort === 'title') return (left.title || left.cwd).localeCompare(right.title || right.cwd)
-        return right.updatedAt - left.updatedAt
+    }
+
+    /** Id order used as the tie-break of every sort so paged slices stay stable. */
+    function compareRowIds(left, right) {
+      if (left.id === right.id) return 0
+      return left.id < right.id ? -1 : 1
+    }
+
+    /** Sort a filtered row list; equal keys fall back to id ascending. */
+    function sortRows(rows, sort) {
+      return [...rows].sort((left, right) => {
+        let order
+        if (sort === 'created') order = right.createdAt - left.createdAt
+        else if (sort === 'size') order = right.sizeBytes - left.sizeBytes
+        else if (sort === 'title') order = (left.title || left.cwd).localeCompare(right.title || right.cwd)
+        else order = right.updatedAt - left.updatedAt
+        // `!order` also catches NaN from a missing numeric field.
+        return !order ? compareRowIds(left, right) : order
       })
+    }
+
+    /** Group sorted rows in workspace order, keeping the ungrouped group last. */
+    function groupRows(sorted, workspaceOrder) {
       const baseGroups = []
       for (const workspace of workspaceOrder) {
-        const groupRows = orderBranchRows(sorted.filter((row) => row.workspaceId === workspace.id))
-        if (groupRows.length === 0) continue
+        const rows = orderBranchRows(sorted.filter((row) => row.workspaceId === workspace.id))
+        if (rows.length === 0) continue
         baseGroups.push({
           ...workspace,
-          rows: groupRows,
-          bytes: groupRows.reduce((sum, row) => sum + row.sizeBytes, 0),
+          rows,
+          bytes: rows.reduce((sum, row) => sum + row.sizeBytes, 0),
         })
       }
       const ungroupedRows = orderBranchRows(sorted.filter((row) => row.workspaceId === null))
@@ -1417,7 +1429,12 @@ window.__ModuleLoader__.load({
           bytes: ungroupedRows.reduce((sum, row) => sum + row.sizeBytes, 0),
         })
       }
-      const groups = baseGroups.map((group) => {
+      return baseGroups
+    }
+
+    /** Attach expansion + page-limit state to each group; only expanded groups render rows. */
+    function expandGroups(baseGroups, { expanded, defaultExpanded, limits, filtering }) {
+      return baseGroups.map((group) => {
         const isExpanded = filtering ? true : (expanded === null ? defaultExpanded : expanded.has(group.id))
         const limit = limits[group.id] ?? GROUP_PAGE_SIZE
         return {
@@ -1427,6 +1444,47 @@ window.__ModuleLoader__.load({
           renderedRows: isExpanded ? group.rows.slice(0, limit) : [],
         }
       })
+    }
+
+    /**
+     * Keep only the selected ids that are still visible. Returning the previous
+     * Set when nothing is dropped keeps the React state identity stable.
+     */
+    function pruneSelection(selected, visibleIdSet) {
+      if (selected.size === 0) return selected
+      const next = new Set()
+      for (const id of selected) if (visibleIdSet.has(id)) next.add(id)
+      return next.size === selected.size ? selected : next
+    }
+
+    /**
+     * Key of every scope-dependent client state (selection pruning, page
+     * limits): it must change whenever a filter *or the sort* changes.
+     */
+    function scopeKey({ generatedAt, tab, workspaceFilter, query, sort, includeSubagents, showBlank, defaultExpanded, expanded }) {
+      return [
+        generatedAt ?? 0,
+        tab,
+        workspaceFilter,
+        query,
+        sort,
+        includeSubagents ? 1 : 0,
+        showBlank ? 1 : 0,
+        defaultExpanded ? 1 : 0,
+        expanded === null || expanded === undefined ? 'auto' : [...expanded].sort().join(','),
+      ].join('|')
+    }
+
+    /**
+     * Derive the filtered / grouped / rendered view for the list.
+     * Pure so the selection-pruning effect can use it before the loading guard.
+     */
+    function computeView({ state, tab, workspaceFilter, query, sort, expanded, defaultExpanded, limits, showBlank }) {
+      const rows = state?.sessions ?? []
+      const workspaceOrder = state?.workspaces ?? []
+      const filtering = query.trim() !== ''
+      const sorted = sortRows(filterRows(rows, { tab, workspaceFilter, query, showBlank }), sort)
+      const groups = expandGroups(groupRows(sorted, workspaceOrder), { expanded, defaultExpanded, limits, filtering })
       const visibleRows = groups.flatMap((group) => (group.expanded ? group.rows : []))
       return {
         filteredRows: sorted,
@@ -1532,7 +1590,7 @@ window.__ModuleLoader__.load({
 
       React.useEffect(() => {
         setLimits({})
-      }, [tab, workspaceFilter, query, includeSubagents, showBlank])
+      }, [tab, workspaceFilter, query, sort, includeSubagents, showBlank])
 
       const rows = state?.sessions ?? []
       const defaultExpanded = (state?.totals?.all ?? 0) <= DEFAULT_COLLAPSE_AFTER
@@ -1541,25 +1599,11 @@ window.__ModuleLoader__.load({
         [state, tab, workspaceFilter, query, sort, expanded, defaultExpanded, limits, showBlank],
       )
       const viewKey = React.useMemo(
-        () => [
-          state?.generatedAt ?? 0,
-          tab,
-          workspaceFilter,
-          query,
-          includeSubagents ? 1 : 0,
-          showBlank ? 1 : 0,
-          defaultExpanded ? 1 : 0,
-          expanded === null ? 'auto' : [...expanded].sort().join(','),
-        ].join('|'),
-        [state?.generatedAt, tab, workspaceFilter, query, includeSubagents, showBlank, defaultExpanded, expanded],
+        () => scopeKey({ generatedAt: state?.generatedAt, tab, workspaceFilter, query, sort, includeSubagents, showBlank, defaultExpanded, expanded }),
+        [state?.generatedAt, tab, workspaceFilter, query, sort, includeSubagents, showBlank, defaultExpanded, expanded],
       )
       React.useEffect(() => {
-        setSelected((previous) => {
-          if (previous.size === 0) return previous
-          const next = new Set()
-          for (const id of previous) if (view.visibleIdSet.has(id)) next.add(id)
-          return next.size === previous.size ? previous : next
-        })
+        setSelected((previous) => pruneSelection(previous, view.visibleIdSet))
       }, [viewKey])
 
       const run = async (operation, successText) => {
@@ -2084,6 +2128,8 @@ window.__ModuleLoader__.load({
 
     return {
       inject: ['slots', 'locale'],
+      /** Pure helpers for `node --test`; not part of the Host/client contract. */
+      __test: { computeView, orderBranchRows, pruneSelection, scopeKey },
       apply(ctx) {
         const t = ctx.locale.bind(NS)
         ctx.effect(() => ctx.locale.register(NS, DICT), 'session-mng: dictionaries')
