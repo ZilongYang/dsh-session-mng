@@ -1,6 +1,6 @@
 # Roadmap
 
-> 当前：`0.2.0` 已在 `main` 实现并测试通过（Host overview + 分页 sessions + 客户端两段式），等待实机验收与发布；线上 npm `latest` 仍为 `0.1.4`。0.2.0 计划与验收见 [docs/PLAN-2026-10-29.md](docs/PLAN-2026-10-29.md) 与 [docs/RELEASE-CHECKLIST-0.2.0.md](docs/RELEASE-CHECKLIST-0.2.0.md)。下一任接手见 [docs/HANDOVER-2026-10-29.md](docs/HANDOVER-2026-10-29.md)。
+> 当前：`0.2.0` 已发布（npm latest / tag `v0.2.0` / Release，2026-10-29）：Host 侧 overview + 分页 sessions（1000–10000 条会话）+ 客户端两段式加载。0.2.0 计划与验收见 [docs/PLAN-2026-10-29.md](docs/PLAN-2026-10-29.md) 与 [docs/RELEASE-CHECKLIST-0.2.0.md](docs/RELEASE-CHECKLIST-0.2.0.md)。下一项候选见本文件 Later candidates 与 [docs/HANDOVER-2026-10-29.md](docs/HANDOVER-2026-10-29.md)。
 
 ## 0.1.0 — delivered
 
@@ -40,7 +40,7 @@
 - 头部三个按钮移到会话管理标题右侧；副标题与统计信息独占下方整行。
 - 空会话：「归档空会话（N）」一键分批归档；「清理空会话（N）」只要有已归档空会话就显示；删除范围预览与删除按 `maxBatch` 分批，超过 50 条也能一次确认完成。
 
-## 0.2.0 — implemented (awaiting publication)
+## 0.2.0 — delivered (published)
 
 首要目标：真正支撑 1000–10000 条会话，不再首屏拉全量 `state`。计划与实施记录见 [docs/PLAN-2026-10-29.md](docs/PLAN-2026-10-29.md)。
 

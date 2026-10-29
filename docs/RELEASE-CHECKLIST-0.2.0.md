@@ -55,16 +55,19 @@
   - [x] 真机 API：`overview` 200 / 3.9 ms；`sessions` 50 行、total 54、hasMore；`search` 14 组 / 81 条；`sizes` 与 `/state` 的 `totals.bytes` 完全一致（66,385,772 B）；per-workspace count 与 `/state` 逐项相等；`overview.totals`（all/hiddenSubagents/forks）与 `/state` 相等；`/sessions?workspaceId=all` 404、缺参 400、POST 405。
   - [x] 真机 UI（ego-browser）：首屏只发 `overview + blanks + sizes`（**无 `/state`**）；展开最大工作区只发一次 `/sessions?...offset=0&limit=50&sizes=1`，渲染 50 行，组头「54 个会话 · 约 14 MiB · 已加载 50/54」；「加载更多」追加到 54 行；全库搜索只发一次 `/search`，14 个工作区自动展开、81 行；点行进详情只发一次 `/session?id=…`（另有既有 `preview`），返回按钮正常；`显示空会话` 切换后 tabs 108→109、隐藏空会话提示消失，`归档空会话（1）` 按钮保持；分支行显示「↳ 来自：父标题」并缩进 18px，无「来源父会话已不存在」误报。
   - [x] 真机 `/state` 仍 200（旧客户端兼容）；运行全程无前端报错、无重复请求风暴。
-  - [ ] Desktop 应用重启后的最终确认（Client 刷新即可；Host 需重启）：当前正在运行的 Desktop 仍是旧 Host（`/overview` → 405 POST only）。
+  - [x] Desktop 应用重启后的最终确认（2026-10-29 17:44 子龙重启并确认 UI 正常）：新 GUI `http://127.0.0.1:62203` 上 `GET /overview` 200 / `source: "catalog"`、`GET /state` 200。
 - [ ] 截图更新（`assets/screenshot-*.png`，重启后按 0.2.0 列表/分页/搜索状态重拍）。
 
-## C. 发布（待执行，需子龙确认）
+## C. 发布（已完成，2026-10-29）
 
-- [ ] `package.json` 0.2.0（已完成版本号）。
-- [ ] `npm publish`（`npm --cache /tmp/dsh-npm-cache publish`），验证版本端点 200、`latest` = 0.2.0、`dist.fileCount` = 39。
-- [ ] Git：main push；tag `v0.2.0`；GitHub Release。
-- [ ] 更新 README 当前状态、ROADMAP、`docs/02-open-source-and-marketplace.md`（0.2.0 发布记录）、marketplace 卡片版本（随 npm 自动更新，无需改 YAML）。
-- [ ] 在 `docs/PLAN-2026-10-29.md` 末尾补「事后差异（补记）」。
+- [x] `package.json` 0.2.0。
+- [x] `npm --cache /tmp/dsh-npm-cache --logs-dir /tmp/dsh-npm-logs publish`：+ dsh-session-mng@0.2.0，41 个文件 / 629.8 kB（unpacked 982.4 kB），shasum `ef3d3fac8467b8fa4e47642ed7c837bad5107ce9`。
+- [x] Git：main push（`63fa300..514f139`）；tag `v0.2.0`；GitHub Release https://github.com/ZilongYang/dsh-session-mng/releases/tag/v0.2.0
+- [x] 更新 README 当前状态、ROADMAP（delivered）、`docs/02-open-source-and-marketplace.md`（0.2.0 发布记录）。
+- [x] 在 `docs/PLAN-2026-10-29.md` 末尾补「事后差异（补记）」。
+- [x] 站点 `dsh.zlmix.com/session-mng/` 更新并部署（0.2.0 版本/功能文案/数据流/JSON-LD/sitemap；自检 PASS，线上验证 8 路径 200）。
+- [ ] 市场卡片版本确认：发布后 awesome-dsh-plugin `plugins.json` 仍为 0.1.4（其同步/构建缓存），待刷新后确认变为 0.2.0；条目 YAML 无需修改。
+- [ ] 截图更新（`assets/screenshot-*.png` 仍为 0.1.x；站点 `assets/shots/mng-*.png` 亦为旧图，可在需要时重拍）。
 
 ## D. 已知口径与差异（写入文档）
 

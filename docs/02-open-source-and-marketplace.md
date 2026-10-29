@@ -162,4 +162,7 @@ curl -s https://awesome-dsh-plugin.com/plugins.json | grep -i session-mng
 
 - 计划：[PLAN-2026-10-29.md](PLAN-2026-10-29.md)；发布清单：[RELEASE-CHECKLIST-0.2.0.md](RELEASE-CHECKLIST-0.2.0.md)。
 - 本地：129 测试全绿；10k 合成基准 overview 9.5 ms / 1338 B、单页 8.8 ms / 25.3 KB；`npm pack --dry-run` 41 文件 / 628.2 kB。
-- 待执行：Desktop 重启后的实机只读验收、截图重拍、`npm publish`、tag `v0.2.0`、GitHub Release、市场卡片版本确认（应自动变为 0.2.0）。
+- 已完成（2026-10-29）：npm `dsh-session-mng@0.2.0` 发布（41 文件 / 629.8 kB，`latest`=0.2.0，版本端点 200）、tag `v0.2.0`、GitHub Release https://github.com/ZilongYang/dsh-session-mng/releases/tag/v0.2.0 。
+- 站点 `dsh.zlmix.com/session-mng/` 已更新并部署（站点仓库提交「content: track dsh-session-mng 0.2.0」；自检 0 error / 0 warning；线上 8 条路径全部 200，未知路径 404，index.html 校验一致）；线上数据版本 `0.2.0`、DSH tested `0.2.1-rc.3`。
+- awesome-dsh-plugin 的 `plugins.json` 在发布后仍显示 `0.1.4`（它自己的同步/构建缓存），待其刷新后确认卡片版本变为 `0.2.0`；条目 YAML 无需修改。
+- 截图仍为 0.1.x 图片（界面变化不大），需要时可重拍。
