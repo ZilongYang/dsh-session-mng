@@ -34,9 +34,9 @@
 
 - [x] `package.json` 0.2.1。
 - [x] `CHANGELOG.md` 0.2.1 段落。
-- [ ] `npm publish`：待执行。
-- [ ] Git：commit + push + tag `v0.2.1` + GitHub Release：待执行。
-- [ ] README「当前状态」、ROADMAP、市场卡片版本确认：随发布回填。
+- [x] `npm publish`：+ dsh-session-mng@0.2.1，43 个文件 / 635.9 kB（unpacked 997.1 kB），shasum `bb7ed25edbc2d4054c55104994be5484106a5ca6`。
+- [x] Git：commit `9679a24`，main push（`98e8a81..9679a24`），tag `v0.2.1`，GitHub Release https://github.com/ZilongYang/dsh-session-mng/releases/tag/v0.2.1
+- [x] README「当前状态」与 ROADMAP 已更新；市场卡片版本随 npm 自动更新（待确认变为 0.2.1）。
 - [ ] 站点 `dsh.zlmix.com/session-mng/` 文案/版本更新（如需）：待定。
 
 ## D. 已知口径

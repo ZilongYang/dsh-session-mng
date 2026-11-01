@@ -69,4 +69,5 @@
   `details.rollback` 数组。
 - 测试：服务端 2 条新用例替换原来的 `subagent descendants still block moving their source`；
   全套 131 个测试通过。
-- 未做（留到 0.2.1 发版）：实机验收整枝移动、README/CHANGELOG 发版记录、版本号提升。
+- 实机验收（2026-11-02）：`Tauri 封装 pi-web 项目`（1 父 + 5 子代理）整枝移动到 `pi-web-desktop` 成功。
+- 已随 **0.2.1** 发布（npm / GitHub / Release，tag `v0.2.1`），见 [RELEASE-CHECKLIST-0.2.1.md](RELEASE-CHECKLIST-0.2.1.md)。
