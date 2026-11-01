@@ -38,6 +38,7 @@ const React = {
 function loadClient() {
   let factory = null
   const net = { fetch: undefined }
+  const reloads = { count: 0 }
   const window = {
     __ModuleLoader__: {
       load(options) {
@@ -46,6 +47,7 @@ function loadClient() {
     },
     addEventListener() {},
     removeEventListener() {},
+    location: { reload: () => { reloads.count += 1 } },
   }
   const document = {
     querySelector: () => null,
@@ -75,7 +77,7 @@ function loadClient() {
   })
   assert.equal(typeof exported?.apply, 'function', 'module exports apply()')
   assert.ok(exported.__test, 'module exports the __test helpers')
-  return { test: exported.__test, setFetch: (fn) => { net.fetch = fn } }
+  return { test: exported.__test, setFetch: (fn) => { net.fetch = fn }, reloads }
 }
 
 const testApi = loadClient()
@@ -1134,6 +1136,18 @@ test('page talks to /overview + /sizes then one /sessions page per expanded work
   const afterRefresh = collect(instance.element(), Group).map((node) => node.props.group)
   assert.deepEqual(idsOf(afterRefresh[0].rows), ['a', 'b'])
   assert.equal(calls.filter((url) => url.includes('workspaceId=w1') && new URL(`http://host${url}`).searchParams.get('offset') === '1').length, 2)
+})
+
+test('the Reload page button reloads the whole DSH page', async () => {
+  installHost(pagedRoutes())
+  const instance = mount(SessionManagerPage, { ctx: { get: () => undefined }, t: smokeT })
+  await instance.flush()
+  const reload = findFirst(instance.element(), (node) => node.type === 'button' && node.children[0] === 'reloadPage')
+  assert.ok(reload, 'the head renders a Reload page button')
+  assert.equal(typeof reload.props.title, 'string', 'the button explains why the page is reloaded')
+  const before = testApi.reloads.count
+  reload.props.onClick()
+  assert.equal(testApi.reloads.count, before + 1, 'clicking it reloads the page exactly once')
 })
 
 test('a failing workspace page shows an error state and can be retried', async () => {

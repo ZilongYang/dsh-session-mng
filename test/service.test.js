@@ -449,13 +449,41 @@ test('an ordinary fork descendant no longer blocks moving its source', { skip: !
   }
 })
 
-test('subagent descendants still block moving their source', { skip: !HAS_ZSTD }, async () => {
+test('a root moves together with its subagent descendants', { skip: !HAS_ZSTD }, async () => {
   const fixture = await makeLineageFixture()
   try {
     const service = createService(fixture.ctx, normalizeConfig({ sessionsRoot: fixture.root }))
     const result = await service.move([fixture.rootId], 'w-new')
+    assert.equal(result.totals.succeeded, 1, JSON.stringify(result))
+    const moved = result.results[0]
+    assert.equal(moved.family, 2, 'the family is the root plus one subagent')
+    assert.deepEqual([...moved.sessions].sort(), [fixture.rootId, fixture.subId].sort())
+    assert.deepEqual(fixture.workspace.sessionIds, [fixture.forkId], 'only the ordinary fork stays behind')
+    assert.deepEqual([...fixture.newWorkspace.sessionIds].sort(), [fixture.rootId, fixture.subId].sort())
+    assert.equal(await currentLogFile(fixture.rootDir), undefined, 'the root left its old directory')
+    assert.equal(await currentLogFile(fixture.subDir), undefined, 'the subagent followed its root')
+    assert.ok(await currentLogFile(fixture.forkDir), 'the fork keeps its own directory')
+
+    const movedRoot = await readHeaderOf(join(fixture.root, projectKey(fixture.newCwd), encodeSegment(fixture.rootId)))
+    const movedSub = await readHeaderOf(join(fixture.root, projectKey(fixture.newCwd), encodeSegment(fixture.subId)))
+    assert.equal(movedRoot?.cwd, fixture.newCwd)
+    assert.equal(movedSub?.cwd, fixture.newCwd)
+    assert.equal(movedSub?.parentSession, fixture.rootId, 'lineage survives the move')
+  } finally {
+    await rm(fixture.base, { recursive: true, force: true })
+  }
+})
+
+test('a live subagent refuses the whole family before any byte moves', { skip: !HAS_ZSTD }, async () => {
+  const fixture = await makeLineageFixture()
+  try {
+    fixture.ctx.sessions = { get: (id) => (id === fixture.subId ? { id } : undefined) }
+    const service = createService(fixture.ctx, normalizeConfig({ sessionsRoot: fixture.root }))
+    const result = await service.move([fixture.rootId], 'w-new')
     assert.equal(result.totals.failed, 1)
-    assert.equal(result.results[0].error.code, 'has-descendants')
+    assert.equal(result.results[0].error.code, 'session-live')
+    assert.equal(result.results[0].error.details?.sessionId, fixture.subId)
+    assert.ok(await currentLogFile(fixture.rootDir), 'the root stays put when the family cannot move')
     assert.deepEqual(fixture.newWorkspace.sessionIds, [])
   } finally {
     await rm(fixture.base, { recursive: true, force: true })

@@ -59,7 +59,7 @@
 - `(sortValue,id)` keyset 游标，替换 0.2.0 的裸 offset 分页，进一步抗数据变化。
 - 导出所选会话为 Markdown / JSON（删除前的安全网；批量）。
 - 置顶 / 取消置顶（`workspaceRegistry.pinSession` / `unpinSession`）。
-- 整枝移动（父会话 + 分支会话 + 子代理后代一起迁移），或在移动时保留父链接。
+- ~~整枝移动（父会话 + 子代理后代一起迁移）~~ 已实现（2026-11-02，见 [docs/PLAN-2026-11-02-family-move.md](docs/PLAN-2026-11-02-family-move.md)）；普通分支（fork）仍按独立会话处理，不跟随。
 - 会话体检 / 修复：重复目录、幽灵归档、workspace 账本与 header cwd 不一致、损坏日志报告。
 - 可选回收站（与「彻底删除」并存，默认关闭）。
 - 移动的增量实现（rename 而不是整目录复制），大日志更快。

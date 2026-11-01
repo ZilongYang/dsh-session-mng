@@ -33,6 +33,8 @@ window.__ModuleLoader__.load({
         pageTitle: '会话管理',
         pageSubtitle: '管理当前 profile 的全部会话：标题、归档、移动与彻底删除。',
         refresh: '刷新',
+        reloadPage: '刷新页面',
+        reloadPageHint: '重新加载整个 DSH 页面：侧栏会话列表会按最新的工作区归属重新分组（移动会话后使用）。',
         loading: '正在读取会话…',
         loadFailed: '读取会话失败：{message}',
         retry: '重试',
@@ -173,6 +175,7 @@ window.__ModuleLoader__.load({
         workspaceMissingErr: '目标工作区目录不存在。',
         notFound: '会话或工作区不存在。',
         batchDone: '已处理：成功 {ok}，失败 {failed}。',
+        movedWithFamily: '连同 {n} 个子代理会话一起移动',
         batchFailed: '有 {failed} 个操作失败。',
         failures: '失败详情',
         detailsToggle: '展开详情',
@@ -208,6 +211,8 @@ window.__ModuleLoader__.load({
         pageTitle: 'Session Manager',
         pageSubtitle: 'Manage every session in this profile: titles, archive, move, and permanent deletion.',
         refresh: 'Refresh',
+        reloadPage: 'Reload page',
+        reloadPageHint: 'Reload the whole DSH page so the sidebar regroups sessions by their current workspace (use it after a move).',
         loading: 'Loading sessions…',
         loadFailed: 'Could not load sessions: {message}',
         retry: 'Retry',
@@ -348,6 +353,7 @@ window.__ModuleLoader__.load({
         workspaceMissingErr: 'The target workspace directory is missing.',
         notFound: 'The session or workspace was not found.',
         batchDone: 'Processed: {ok} succeeded, {failed} failed.',
+        movedWithFamily: 'moved together with {n} subagent session(s)',
         batchFailed: '{failed} operations failed.',
         failures: 'Failure details',
         detailsToggle: 'Show details',
@@ -718,26 +724,30 @@ window.__ModuleLoader__.load({
     /** How long a plain success toast stays before hiding itself. */
     const NOTICE_HIDE_MS = 5000
 
+    /** A success toast offering one follow-up action stays a little longer. */
+    const NOTICE_HIDE_ACTION_MS = 8000
+
     /**
      * Operation-result toast.
      *
      * It floats above the settings pane (instead of sitting in the scroll flow),
-     * so a result is visible no matter where the list is scrolled. A plain
-     * success toast hides itself after a few seconds; failures and notices with
-     * an action stay until the user dismisses them, because they carry details
-     * worth reading.
+     * so a result is visible no matter where the list is scrolled. A success
+     * toast hides itself after a few seconds, with or without a follow-up
+     * action; failures and warnings stay until the user dismisses them, because
+     * they carry details worth reading.
      */
     function Notice({ notice, t, onDismiss }) {
       const dismiss = React.useRef(onDismiss)
       dismiss.current = onDismiss
       const transient = notice !== null && notice !== undefined
-        && notice.tone !== 'error' && notice.tone !== 'warn'
-        && notice.details === undefined && notice.action === undefined
+        && notice.details === undefined
+        && (notice.tone === 'ok' || (notice.tone !== 'error' && notice.tone !== 'warn' && notice.action === undefined))
+      const delay = notice?.action === undefined ? NOTICE_HIDE_MS : NOTICE_HIDE_ACTION_MS
       React.useEffect(() => {
         if (!transient) return undefined
-        const timer = setTimeout(() => dismiss.current?.(), NOTICE_HIDE_MS)
+        const timer = setTimeout(() => dismiss.current?.(), delay)
         return () => clearTimeout(timer)
-      }, [notice, transient])
+      }, [notice, transient, delay])
       if (notice === null || notice === undefined) return null
       return h(
         'div',
@@ -2154,6 +2164,19 @@ window.__ModuleLoader__.load({
         setDetailNonce((value) => value + 1)
       }
 
+      /**
+       * Reload the whole DSH page. The sidebar keeps the workspace grouping it
+       * loaded, so a moved session stays under the old workspace until the page
+       * reloads; this is the same call the plugin market makes after a change.
+       */
+      const reloadPage = () => {
+        try {
+          window.location.reload()
+        } catch {
+          // A host without a reloadable location leaves the page as it is.
+        }
+      }
+
       React.useEffect(() => {
         void loadOverview()
         return () => {
@@ -2406,12 +2429,30 @@ window.__ModuleLoader__.load({
       const totalBytes = sizes?.totalBytes
       const sizeText = Number.isFinite(totalBytes) ? formatBytes(totalBytes) : '—'
 
+      /** Compact per-session failures a batch reports inside a 200 response. */
+      const failuresOf = (value) => {
+        const failed = (value?.results ?? []).filter((item) => item.ok === false)
+        if (failed.length === 0) return undefined
+        return failed.slice(0, 20).map((item) => ({
+          sessionId: item.sessionId,
+          code: item.error?.code ?? 'failed',
+          message: item.error?.message ?? '',
+        }))
+      }
+
       const run = async (operation, successText) => {
         setBusy(true)
         setNotice(null)
         try {
           const value = await operation()
-          setNotice({ tone: 'ok', text: successText(value) })
+          // A batch can answer 200 while every item failed; surface the reasons
+          // instead of reporting a bare "0 succeeded / 1 failed".
+          const failures = failuresOf(value)
+          setNotice(
+            failures === undefined
+              ? { tone: 'ok', text: successText(value) }
+              : { tone: 'error', text: successText(value), details: failures },
+          )
           await refresh()
           return value
         } catch (failure) {
@@ -2425,7 +2466,13 @@ window.__ModuleLoader__.load({
       const resultText = (value) => {
         const valueTotals = value?.totals
         if (valueTotals === undefined) return t('working')
-        return t('batchDone', { ok: valueTotals.succeeded, failed: valueTotals.failed })
+        const base = t('batchDone', { ok: valueTotals.succeeded, failed: valueTotals.failed })
+        // Moves carry subagent descendants along; say so, because the count of
+        // moved rows is larger than the number of selected sessions.
+        const family = (value?.results ?? [])
+          .filter((item) => item.ok === true && Number.isFinite(item.family) && item.family > 1)
+          .reduce((sum, item) => sum + (item.family - 1), 0)
+        return family > 0 ? `${base} · ${t('movedWithFamily', { n: family })}` : base
       }
 
       const archiveRows = async (ids, stopActivity = false) => {
@@ -2718,6 +2765,12 @@ window.__ModuleLoader__.load({
                 : null,
               h('button', { type: 'button', className: 'dsm-btn', disabled: busy, onClick: () => void refresh() },
                 busy ? h(Spinner, { t, label: t('working') }) : t('refresh')),
+              h('button', {
+                type: 'button',
+                className: 'dsm-btn',
+                title: t('reloadPageHint'),
+                onClick: reloadPage,
+              }, t('reloadPage')),
             ),
           ),
           h('p', { className: 'dsm-sub' }, t('pageSubtitle')),
