@@ -42,10 +42,10 @@
 
 ## C. 发布
 
-- [ ] `npm publish`（0.2.3）
-- [ ] Git：commit / main push / tag `v0.2.3` / GitHub Release
+- [x] Git：commit `8872297`，main push（`90aba6a..8872297`），tag `v0.2.3`（annotated），GitHub Release <https://github.com/ZilongYang/dsh-session-mng/releases/tag/v0.2.3>
+- [x] `npm publish`：+ dsh-session-mng@0.2.3，47 个文件 / 658.4 kB（unpacked 1.1 MB），shasum `5dd0a79529ca0c61264f96e8d513adaf118582c5`；`npm view` 已确认 `latest = 0.2.3`（registry 异步处理，约 2 分钟后可读）。
 - [ ] 站点 `dsh.zlmix.com/session-mng/` 更新到 0.2.3
-- [ ] README「当前状态」与 ROADMAP 标记已发布
+- [x] README「当前状态」与 ROADMAP 标记已发布
 
 ## D. 已知口径
 

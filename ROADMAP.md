@@ -1,13 +1,13 @@
 # Roadmap
 
-> 当前：`0.2.3` **验收已通过（待发版，2026-11-06）**：工作区归属自检 + 一键归位（左侧栏只渲染工作区账本，账本漏登记时用按钮 attachSession 补回；纯账本写、不改日志）。1 次实机验收：点按钮后左侧栏即时出现、账本 10→12。`0.2.2` 已发布（npm latest / tag `v0.2.2` / Release，2026-11-05）：DSH 0.2.2 的独立 fork 适配 + 投影读取迁移 + 移除「刷新页面」按钮。依据 [docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md](docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md) 与 [docs/PLAN-2026-11-05-dsh-0.2.2-compat.md](docs/PLAN-2026-11-05-dsh-0.2.2-compat.md)。
+> 当前：`0.2.3` 已发布（npm latest / tag `v0.2.3` / Release，2026-11-06）：工作区归属自检 + 一键归位（左侧栏只渲染工作区账本，账本漏登记时用按钮 attachSession 补回；纯账本写、不改日志）。1 次实机验收：点按钮后左侧栏即时出现、账本 10→12。`0.2.2` 已发布（npm latest / tag `v0.2.2` / Release，2026-11-05）：DSH 0.2.2 的独立 fork 适配 + 投影读取迁移 + 移除「刷新页面」按钮。依据 [docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md](docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md) 与 [docs/PLAN-2026-11-05-dsh-0.2.2-compat.md](docs/PLAN-2026-11-05-dsh-0.2.2-compat.md)。
 
-## 0.2.3 — 验收通过（待发版）
+## 0.2.3 — delivered (published)
 
 - 工作区归属自检：行新增 `membership: ledger | cwd | none`，`/overview` 增加 `totals.misplaced` 计数。
 - `GET /misplaced` 候选列表（≤`maxBatch`，标注 `truncated`）+ `POST /repair` 一键归位；归位走公开 `workspace.attachSession`，只写账本、不改会话字节，live/archived 均可。
 - 会话管理页横幅「一键归位」、行「未归位」徽标、详情页归位按钮；宿主 `session.list` 仍未返回该会话时明确提示需重启，不假装成功。
-- 144 个测试全绿；实机验收通过（2026-11-06，见 [docs/RELEASE-CHECKLIST-0.2.3.md](docs/RELEASE-CHECKLIST-0.2.3.md)），待发版。
+- 144 个测试全绿；实机验收通过（2026-11-06）；已发 npm / GitHub Release，见 [docs/RELEASE-CHECKLIST-0.2.3.md](docs/RELEASE-CHECKLIST-0.2.3.md)。
 
 ## 0.1.0 — delivered
 
