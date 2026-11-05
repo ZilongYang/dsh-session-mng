@@ -73,20 +73,20 @@
 4. `sessionQuery.readTitleSnapshots(ids)`：只为缺失标题的行补读。
 5. `archivedSessionIds` / `pinnedSessionIds`。
 
-会话按三类打标（`kind`），这是 0.1.3 修正的核心：**不能用「有 `parentSession`」判定子会话**，因为分支会话（fork）也带 parent。
+会话按三类打标（`kind`），这是 0.1.3 修正的核心：**不能用「有 `parentSession`」判定子会话**，因为分支会话（fork）也带 parent。0.2.2 起 DSH 不再给普通 fork 写 `parentSession`，分类器因此改为「父 id 或 `isSeeded`」双判据：
 
-- `root`：无 parent；
-- `fork`：非子代理且有 parent（`isSeeded:true`、`delegationDepth:0` 为辅证）。它是用户会话，默认可见、可改标题/归档/删除，但不可单独移动；
-- `subagent`：`origin:'subagent'` 或 `delegationDepth≥1`（委派产生）。`subagents=0` 时过滤，并计入 `totals.hiddenSubagents` 供 UI 提示。
+- `root`：无 parent 且非 seeded；
+- `fork`：非子代理，且有 parent（历史日志，`forkLineage: 'recorded'`）**或** `isSeeded:true`（DSH ≥ 0.2.2 的普通 fork，`forkLineage: 'none'`）。它是用户会话，默认可见、可改标题/归档/删除；有来源记录的分支要留在父工作区，无来源记录的分支是独立会话、可单独移动；
+- `subagent`：`origin:'subagent'` 或 `delegationDepth≥1`（委派产生，优先级高于 seeded 兜底）。`subagents=0` 时过滤，并计入 `totals.hiddenSubagents` 供 UI 提示。
 
-行字段：`kind` / `isFork` / `isSubagent`（兼容）/ `parentSessionId` / `parentTitle` / `parentPresent` / `forkCount`；`totals` 附带 `forks` / `hiddenSubagents`。
+行字段：`kind` / `isFork` / `isSubagent`（兼容）/ `forkLineage` / `parentSessionId` / `parentTitle` / `parentPresent` / `forkCount`；`totals` 附带 `forks` / `hiddenSubagents`。
 
 每个会话行带 `can`：
 
 - `title`：有 `llm`；
 - `archive`：未归档；
 - `restore`：已归档；
-- `move`：JSONL + zstd + workspace 缓存 seam 可用 + 非 live/running + `kind === 'root'`（分支要留在父会话工作区）；
+- `move`：JSONL + zstd + workspace 缓存 seam 可用 + 非 live/running +（`kind === 'root'` 或 `kind === 'fork' && forkLineage === 'none'`——后者是 DSH ≥ 0.2.2 的独立 fork，可像根会话一样移动；有来源记录的分支仍要留在父会话工作区）；
 - `delete`：JSONL + 已归档 + 非 live；
 - `open`：总是 true（客户端再判断 `uiWorkspace` 是否存在）。
 
@@ -126,7 +126,7 @@
 1. `capabilities.move`：JSONL + zstd + `canReconcileMove(registry)`。
 2. `stat(id)` 存在，header `cwd` 非空。
 3. 非 live（`ctx.sessions.get(id) === undefined`）；非 running。
-4. 子代理会话（`origin:'subagent'` 或 `delegationDepth≥1`）不能单独移动；普通分支（含历史 fork）是独立会话，不阻止移动。
+4. 子代理会话（`origin:'subagent'` 或 `delegationDepth≥1`）不能单独移动；有来源记录的普通分支（历史 fork）要留在父工作区；DSH ≥ 0.2.2 的无来源 fork 是独立会话，不阻止移动。
 5. `traceSession(id)` 无**子代理** descendants（普通分支会出现在谱系里，但不再阻止移动）。
 6. 目标 workspace 存在且 `status() === 'ok'`；目标目录不存在。
 7. 源目录唯一；目标目录由 `locate({id,cwd:target.path})` 推导。
@@ -214,7 +214,7 @@ targetDir  = dirname(locate({id, cwd: target.path}))
 
 - live 会话不能移动/删除（重启后重试）。
 - 有子代理后代的会话不能单独移动（0.2.0 整枝移动）。
-- 普通分支（含历史 fork）不随父会话删除，会失去来源标识。宿主「普通 fork 不再写 `parentSession`」的变更在 DSH 源码里已合入，但**尚未进入当前安装的 0.2.1-rc.3 构建**（2026-10-28 实测：新建 fork 仍带 `parentSession`，app.asar 里仍有旧写入代码），所以这类「历史分支」形态短期仍会持续出现；插件对两种形态一视同仁。
+- 普通分支（含历史 fork）不随父会话删除；有来源记录的旧分支会失去来源标识（显示「来源父会话已不存在」）。**DSH 0.2.2-rc.1 起普通 fork 不再写 `parentSession`**（官方升级指南："no replacement source field is written"）：新分支没有来源可显示，插件用 `isSeeded` 兜底识别为分支并标注「来源未记录」，允许单独移动；子代理仍带 `origin:'subagent'`，判定不受影响。
 - 移动是整目录复制，大日志会慢；0.2.0 评估 rename/增量。
 - 非 JSONL 后端不支持移动/删除。
 - workspace 缓存 seam 是版本敏感点；升级 DSH 后先跑测试与实机验收。

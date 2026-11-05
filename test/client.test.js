@@ -590,6 +590,30 @@ test('annotateBranchRows leaves non-fork rows untouched', () => {
   assert.equal(annotateBranchRows([normal])[0], normal)
 })
 
+test('annotateBranchRows marks a source-less fork as unknown, never as a missing parent', () => {
+  // DSH >= 0.2.2 writes no parent for ordinary forks: the row carries
+  // `forkLineage: 'none'` and must not claim the source session is gone.
+  const seeded = row('s', {
+    kind: 'fork',
+    forkLineage: 'none',
+    parentSessionId: null,
+    parentPresent: false,
+    branchDepth: 1,
+  })
+  const [unknown] = annotateBranchRows([seeded])
+  assert.equal(unknown.branchSourceUnknown, true)
+  assert.equal(unknown.branchParentMissing, false)
+  assert.equal(unknown.branchParentNotLoaded, false)
+  assert.equal(unknown.branchParentTitle, '')
+  assert.equal(unknown.branchDepth, 0)
+
+  // A legacy row without the new field still reads "missing" from parentPresent.
+  const legacy = row('l', { kind: 'fork', parentSessionId: 'gone', parentPresent: false })
+  const [missing] = annotateBranchRows([legacy])
+  assert.equal(missing.branchParentMissing, true)
+  assert.equal(missing.branchSourceUnknown, false)
+})
+
 // ---------------------------------------------------------------------------
 // old-Host fallback adapters
 // ---------------------------------------------------------------------------
@@ -821,6 +845,14 @@ test('Row renders loaded, cross-page branch and plain rows', () => {
     branchParentTitle: 'Parent title',
   })
   assert.ok(Row({ row: orphan, selected: false, onToggle() {}, onOpen() {}, t: smokeT }))
+  const sourced = row('sourced', {
+    kind: 'fork',
+    forkLineage: 'none',
+    parentSessionId: null,
+    branchOrphan: true,
+    branchSourceUnknown: true,
+  })
+  assert.ok(Row({ row: sourced, selected: false, onToggle() {}, onOpen() {}, t: smokeT }))
 })
 
 test('Group renders expanded pages, loading and error states', () => {
@@ -894,6 +926,9 @@ test('DetailView renders with the overview and limits inputs', () => {
   }
   assert.ok(DetailView(props))
   assert.ok(DetailView({ ...props, row: { ...row, archived: true, kind: 'fork', parentTitle: 'P' } }))
+  // A source-less fork gets the "source not recorded" meta row instead of the
+  // missing-parent message.
+  assert.ok(DetailView({ ...props, row: { ...row, kind: 'fork', forkLineage: 'none', parentSessionId: null } }))
 })
 
 // ---------------------------------------------------------------------------
@@ -1136,18 +1171,6 @@ test('page talks to /overview + /sizes then one /sessions page per expanded work
   const afterRefresh = collect(instance.element(), Group).map((node) => node.props.group)
   assert.deepEqual(idsOf(afterRefresh[0].rows), ['a', 'b'])
   assert.equal(calls.filter((url) => url.includes('workspaceId=w1') && new URL(`http://host${url}`).searchParams.get('offset') === '1').length, 2)
-})
-
-test('the Reload page button reloads the whole DSH page', async () => {
-  installHost(pagedRoutes())
-  const instance = mount(SessionManagerPage, { ctx: { get: () => undefined }, t: smokeT })
-  await instance.flush()
-  const reload = findFirst(instance.element(), (node) => node.type === 'button' && node.children[0] === 'reloadPage')
-  assert.ok(reload, 'the head renders a Reload page button')
-  assert.equal(typeof reload.props.title, 'string', 'the button explains why the page is reloaded')
-  const before = testApi.reloads.count
-  reload.props.onClick()
-  assert.equal(testApi.reloads.count, before + 1, 'clicking it reloads the page exactly once')
 })
 
 test('a failing workspace page shows an error state and can be retried', async () => {

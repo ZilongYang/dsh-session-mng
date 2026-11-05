@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { buildState } from '../lib/state.js'
+import { buildState, canOf, classifySession } from '../lib/state.js'
 
 function workspace(id, path, sessionIds) {
   return {
@@ -155,4 +155,79 @@ test('buildState can include subagent sessions', async () => {
   assert.equal(s3.kind, 'subagent')
   assert.equal(s3.can.move, false)
   assert.equal(state.sessions.find((row) => row.id === 's4').isFork, true)
+})
+
+test('classifySession recognizes a source-less fork from DSH >= 0.2.2', () => {
+  // DSH 0.2.2 stopped writing parentSession for ordinary forks: seeded and no
+  // delegation is the only remaining signal.
+  assert.equal(classifySession({ isSeeded: true }), 'fork')
+  assert.equal(classifySession({ isSeeded: true, delegationDepth: 0 }), 'fork')
+  // Subagents win over the seeded fallback.
+  assert.equal(classifySession({ isSeeded: true, origin: 'subagent' }), 'subagent')
+  assert.equal(classifySession({ isSeeded: true, delegationDepth: 1 }), 'subagent')
+  // Historical forks keep their recorded parent; plain sessions stay roots.
+  assert.equal(classifySession({ isSeeded: true, parentSession: 'p' }), 'fork')
+  assert.equal(classifySession({ isSeeded: false }), 'root')
+  assert.equal(classifySession({}), 'root')
+})
+
+test('canOf moves a source-less fork like a root but keeps recorded-parent forks in place', () => {
+  const capabilities = { title: true, move: true, delete: true }
+  const base = { archived: false, live: false, running: false }
+  assert.equal(canOf({ ...base, kind: 'root' }, capabilities).move, true)
+  assert.equal(canOf({ ...base, kind: 'fork', forkLineage: 'none' }, capabilities).move, true)
+  assert.equal(canOf({ ...base, kind: 'fork', forkLineage: 'recorded' }, capabilities).move, false)
+  assert.equal(canOf({ ...base, kind: 'subagent' }, capabilities).move, false)
+})
+
+test('buildState lists a source-less fork as a movable branch with no parent', async () => {
+  const ws = workspace('a', '/a', ['root', 'seeded'])
+  const registry = {
+    list: () => [ws],
+    get: () => ws,
+    headers: new Map(),
+    host: { rememberSessionPath() {} },
+    archivedSessionIds: [],
+    pinnedSessionIds: [],
+  }
+  const snapshots = [
+    snapshot('root', '/a', 10),
+    snapshot('seeded', '/a', 20, { isSeeded: true, delegationDepth: 0 }),
+  ]
+  const items = [summary('root', { cwd: '/a' }), summary('seeded', { cwd: '/a' })]
+  const ctx = {
+    sessions: { get: () => undefined },
+    sessionPersistence: {
+      list: async () => snapshots,
+      locate: () => ({ path: '/tmp/log' }),
+      stat: async () => undefined,
+    },
+    sessionQuery: { listSessions: async () => [], readTitleSnapshots: async () => [] },
+    llm: {},
+    workspaceRegistry: registry,
+    get(name) {
+      if (name === 'sessionController') return { list: async () => ({ items }) }
+      if (name === 'workspaceRegistry') return registry
+      if (name === 'agents') return { get: () => undefined }
+      return undefined
+    },
+  }
+  const state = await buildState(ctx, { maxBatch: 50, maxMoveBatch: 20 })
+  const seeded = state.sessions.find((row) => row.id === 'seeded')
+  assert.equal(seeded.kind, 'fork')
+  assert.equal(seeded.isFork, true)
+  assert.equal(seeded.forkLineage, 'none')
+  assert.equal(seeded.parentSessionId, null)
+  assert.equal(seeded.parentTitle, '')
+  assert.equal(seeded.parentPresent, false)
+  assert.equal(seeded.forkCount, 0)
+  assert.equal(seeded.can.move, true)
+  assert.equal(state.totals.forks, 1)
+  assert.equal(state.sessions.find((row) => row.id === 'root').forkLineage, null)
+
+  // The same log read by DSH <= 0.2.1 (with a recorded parent) stays immovable.
+  const historical = await buildState(makeCtx(), { maxBatch: 50, maxMoveBatch: 20 })
+  const fork = historical.sessions.find((row) => row.id === 's4')
+  assert.equal(fork.forkLineage, 'recorded')
+  assert.equal(fork.can.move, false)
 })

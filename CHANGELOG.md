@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.2 — 2026-11-05
+
+### Changed
+
+- **适配 DSH 0.2.2：普通 fork 不再写 `parentSession`，插件仍能认出「分支」**。DSH 0.2.2 起 `SessionStore.fork()` / `sessionController.fork()` 不再记录普通 fork 的来源（官方升级指南："no replacement source field is written"），历史 fork 仍保留父 id。插件此前只靠 `parentSession` 判分支，于是 0.2.2 上新建的 fork 会被当成根会话。现在分类器在「非子代理」前提下把 `isSeeded: true` 也认作普通分支：
+  - 新 fork 显示「分支」徽标，来源行标注「来源未记录」（不再误报「来源父会话已不存在」），不缩进，**允许单独移动**（0.2.2 里它本来就是独立会话）；
+  - 历史 fork（有父 id）行为完全不变：缩进、`↳ 来自：父标题`、`N 分支` 计数、父已删除时「来源父会话已不存在」、不可单独移动；
+  - 子代理仍按 `origin: 'subagent'` / `delegationDepth >= 1` 判定，默认隐藏、整枝移动、级联删除均不受影响。
+  - Wire 行新增 `forkLineage: 'recorded' | 'none' | null`（纯加法）。
+- **投影读取改用 `sessionProjections.snapshot()`**：DSH 0.2.2 给 `sessionProjections.cachedSnapshot()` 标了 `@deprecated`（"never use it to decide behavior"），live 会话的快路径改为 `snapshot(session, keys)`（0.2.1 也有该方法），旧宿主没有时回退 `cachedSnapshot`；冷会话继续用未废弃的 `sessionProjectionCache.cachedSnapshot()`。
+
+### Removed
+
+- **「刷新页面」按钮**：会话管理页头部的整页刷新按钮移除（它是浏览器/宿主层面的操作，放在会话管理页里属于产品错位；跨工作区移动后侧栏分组仍需要整页刷新才会更新，请用浏览器刷新 ⌘R）。这个一键刷新入口已挪到自用的 `dsh-zl-tools`（zTools）设置页。
+
+### Compatibility
+
+- 实测宿主 DSH `0.2.2-rc.1`（桌面 App）与 `0.2.1-rc.5`（全局 CLI）；`dsh.compatibility.dshReleases` 增加这两个版本。`dsh.compatibility.dsh` 维持 `>=0.2.0-rc.1 <0.3.0-0`。
+- 136 个测试全绿（新增 6 条：分类器、移动口径、`forkLineage`、投影读取面优先 `snapshot`、客户端「来源未记录」渲染；移除 1 条刷新按钮用例）。
+- 相关核查：[docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md](docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md)；实施计划：[docs/PLAN-2026-11-05-dsh-0.2.2-compat.md](docs/PLAN-2026-11-05-dsh-0.2.2-compat.md)。
+
 ## 0.2.1 — 2026-11-02
 
 ### Added

@@ -33,8 +33,6 @@ window.__ModuleLoader__.load({
         pageTitle: '会话管理',
         pageSubtitle: '管理当前 profile 的全部会话：标题、归档、移动与彻底删除。',
         refresh: '刷新',
-        reloadPage: '刷新页面',
-        reloadPageHint: '重新加载整个 DSH 页面：侧栏会话列表会按最新的工作区归属重新分组（移动会话后使用）。',
         loading: '正在读取会话…',
         loadFailed: '读取会话失败：{message}',
         retry: '重试',
@@ -96,6 +94,8 @@ window.__ModuleLoader__.load({
         forkCountHint: '该会话有 {n} 个分支会话',
         parentSession: '父会话',
         parentMissing: '来源父会话已不存在',
+        branchSourceUnknown: '来源未记录',
+        branchSourceUnknownHint: 'DSH 0.2.2 起普通分支不再记录来源会话；它仍是独立会话。',
         pinned: '已置顶',
         liveBadge: '已打开',
         noCwd: '无工作目录',
@@ -211,8 +211,6 @@ window.__ModuleLoader__.load({
         pageTitle: 'Session Manager',
         pageSubtitle: 'Manage every session in this profile: titles, archive, move, and permanent deletion.',
         refresh: 'Refresh',
-        reloadPage: 'Reload page',
-        reloadPageHint: 'Reload the whole DSH page so the sidebar regroups sessions by their current workspace (use it after a move).',
         loading: 'Loading sessions…',
         loadFailed: 'Could not load sessions: {message}',
         retry: 'Retry',
@@ -274,6 +272,8 @@ window.__ModuleLoader__.load({
         forkCountHint: 'This session has {n} branch sessions',
         parentSession: 'Parent session',
         parentMissing: 'Source session no longer exists',
+        branchSourceUnknown: 'Source not recorded',
+        branchSourceUnknownHint: 'Since DSH 0.2.2 ordinary forks no longer record their source session; it is still an independent session.',
         pinned: 'Pinned',
         liveBadge: 'Open',
         noCwd: 'No working directory',
@@ -713,8 +713,12 @@ window.__ModuleLoader__.load({
     // Presentational helpers
     // ---------------------------------------------------------------------
 
-    function Badge({ tone, children }) {
-      return h('span', { className: `dsm-badge${tone === undefined ? '' : ` ${tone}`}` }, children)
+    function Badge({ tone, title, children }) {
+      return h(
+        'span',
+        { className: `dsm-badge${tone === undefined ? '' : ` ${tone}`}`, title },
+        children,
+      )
     }
 
     function Spinner({ t, label }) {
@@ -787,17 +791,24 @@ window.__ModuleLoader__.load({
           ? `${t('fromParent', { title: row.branchParentTitle })} · `
           : row.branchParentMissing
             ? `${t('parentMissing')} · `
-            : row.branchParentNotLoaded
-              ? `${t('parentNotLoaded')} · `
-              : row.branchDepth === undefined && row.parentPresent === false
-                ? `${t('parentMissing')} · `
-                : ''
+            : row.branchSourceUnknown
+              ? `${t('branchSourceUnknown')} · `
+              : row.branchParentNotLoaded
+                ? `${t('parentNotLoaded')} · `
+                : row.branchDepth === undefined && row.parentPresent === false
+                  ? `${t('parentMissing')} · `
+                  : ''
+      const branchSourceUnknown = row.branchSourceUnknown === true || row.forkLineage === 'none'
       const badges = []
       if (row.running) badges.push(h(Badge, { key: 'run', tone: 'run' }, t('running')))
       if (row.archived) badges.push(h(Badge, { key: 'arch' }, t('archived')))
       if (row.live) badges.push(h(Badge, { key: 'live', tone: 'brand' }, t('liveBadge')))
       if (row.pinned) badges.push(h(Badge, { key: 'pin' }, t('pinned')))
-      if (branch) badges.push(h(Badge, { key: 'fork', tone: 'brand' }, t('branch')))
+      if (branch) {
+        badges.push(
+          h(Badge, { key: 'fork', tone: 'brand', title: branchSourceUnknown ? t('branchSourceUnknownHint') : undefined }, t('branch')),
+        )
+      }
       if (row.isSubagent) badges.push(h(Badge, { key: 'sub', tone: 'warn' }, t('subagent')))
       if (forkCount > 0) {
         badges.push(
@@ -1302,7 +1313,9 @@ window.__ModuleLoader__.load({
               row.archived ? h(Badge, null, t('archived')) : null,
               row.live ? h(Badge, { tone: 'brand' }, t('liveBadge')) : null,
               row.pinned ? h(Badge, null, t('pinned')) : null,
-              row.kind === 'fork' ? h(Badge, { tone: 'brand' }, t('branch')) : null,
+              row.kind === 'fork'
+                ? h(Badge, { tone: 'brand', title: row.forkLineage === 'none' ? t('branchSourceUnknownHint') : undefined }, t('branch'))
+                : null,
               row.isSubagent ? h(Badge, { tone: 'warn' }, t('subagent')) : null,
             ),
           ),
@@ -1330,9 +1343,11 @@ window.__ModuleLoader__.load({
                   h('dd', null,
                     row.parentTitle !== ''
                       ? row.parentTitle
-                      : row.parentPresent === false
-                        ? t('parentMissing')
-                        : (row.parentSessionId || '')))
+                      : row.forkLineage === 'none'
+                        ? t('branchSourceUnknown')
+                        : row.parentPresent === false
+                          ? t('parentMissing')
+                          : (row.parentSessionId || '')))
               : null,
             h('dt', null, t('path')),
             h('dd', { title: row.cwd }, h('span', { className: 'dsm-mono' }, row.cwd || t('noCwd'))),
@@ -1368,7 +1383,7 @@ window.__ModuleLoader__.load({
             : null,
           !movable
             ? h('p', { className: 'dsm-hint' },
-                row.live ? t('moveLiveHint') : row.kind === 'fork' ? t('moveForkHint') : row.isSubagent ? t('moveSubagentHint') : row.can?.move === false ? t('moveDescendantsHint') : t('moveNoTarget'))
+                row.live ? t('moveLiveHint') : row.kind === 'fork' && row.forkLineage !== 'none' ? t('moveForkHint') : row.isSubagent ? t('moveSubagentHint') : row.can?.move === false ? t('moveDescendantsHint') : t('moveNoTarget'))
             : h(
                 'div',
                 { className: 'dsm-title-row' },
@@ -1632,9 +1647,22 @@ window.__ModuleLoader__.load({
       const ids = new Set(rows.map((row) => row.id))
       return ordered.map((row) => {
         if (row.kind !== 'fork') return row
-        const parentLoaded = row.parentSessionId !== null && ids.has(row.parentSessionId)
+        // DSH >= 0.2.2 records no source for ordinary forks, so "no parent id"
+        // means "source not recorded", never "the parent is gone".
+        if (row.parentSessionId === null || row.forkLineage === 'none') {
+          return {
+            ...row,
+            branchDepth: 0,
+            branchOrphan: true,
+            branchSourceUnknown: true,
+            branchParentTitle: '',
+            branchParentMissing: false,
+            branchParentNotLoaded: false,
+          }
+        }
+        const parentLoaded = ids.has(row.parentSessionId)
         if (parentLoaded) {
-          return { ...row, branchParentTitle: row.parentTitle || '', branchParentMissing: false, branchParentNotLoaded: false }
+          return { ...row, branchParentTitle: row.parentTitle || '', branchParentMissing: false, branchParentNotLoaded: false, branchSourceUnknown: false }
         }
         const stub = row.parentStub
         const stubKnown = stub !== null && stub !== undefined
@@ -1642,12 +1670,12 @@ window.__ModuleLoader__.load({
         const stubTitle = stubKnown && typeof stub.title === 'string' ? stub.title : ''
         const title = stubTitle !== '' ? stubTitle : row.parentTitle || ''
         if (present !== true) {
-          return { ...row, branchDepth: 0, branchOrphan: true, branchParentTitle: '', branchParentMissing: true, branchParentNotLoaded: false }
+          return { ...row, branchDepth: 0, branchOrphan: true, branchParentTitle: '', branchParentMissing: true, branchParentNotLoaded: false, branchSourceUnknown: false }
         }
         if (title !== '') {
-          return { ...row, branchDepth: 0, branchOrphan: true, branchParentTitle: title, branchParentMissing: false, branchParentNotLoaded: false }
+          return { ...row, branchDepth: 0, branchOrphan: true, branchParentTitle: title, branchParentMissing: false, branchParentNotLoaded: false, branchSourceUnknown: false }
         }
-        return { ...row, branchDepth: 0, branchOrphan: true, branchParentTitle: '', branchParentMissing: false, branchParentNotLoaded: true }
+        return { ...row, branchDepth: 0, branchOrphan: true, branchParentTitle: '', branchParentMissing: false, branchParentNotLoaded: true, branchSourceUnknown: false }
       })
     }
 
@@ -2162,19 +2190,6 @@ window.__ModuleLoader__.load({
         await loadOverview({ silent: true })
         setReload((value) => value + 1)
         setDetailNonce((value) => value + 1)
-      }
-
-      /**
-       * Reload the whole DSH page. The sidebar keeps the workspace grouping it
-       * loaded, so a moved session stays under the old workspace until the page
-       * reloads; this is the same call the plugin market makes after a change.
-       */
-      const reloadPage = () => {
-        try {
-          window.location.reload()
-        } catch {
-          // A host without a reloadable location leaves the page as it is.
-        }
       }
 
       React.useEffect(() => {
@@ -2765,12 +2780,6 @@ window.__ModuleLoader__.load({
                 : null,
               h('button', { type: 'button', className: 'dsm-btn', disabled: busy, onClick: () => void refresh() },
                 busy ? h(Spinner, { t, label: t('working') }) : t('refresh')),
-              h('button', {
-                type: 'button',
-                className: 'dsm-btn',
-                title: t('reloadPageHint'),
-                onClick: reloadPage,
-              }, t('reloadPage')),
             ),
           ),
           h('p', { className: 'dsm-sub' }, t('pageSubtitle')),
@@ -2940,7 +2949,7 @@ window.__ModuleLoader__.load({
                         ? h('span', { className: 'dsm-hint' },
                             selectedRows.some((row) => row.live || row.running)
                               ? t('liveHint')
-                              : selectedRows.some((row) => row.kind === 'fork')
+                              : selectedRows.some((row) => row.kind === 'fork' && row.forkLineage !== 'none')
                                 ? t('moveForkHint')
                                 : t('moveUnavailableHint'))
                         : null,

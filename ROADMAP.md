@@ -1,6 +1,6 @@
 # Roadmap
 
-> 当前：`0.2.0` 已发布（npm latest / tag `v0.2.0` / Release，2026-10-29）：Host 侧 overview + 分页 sessions（1000–10000 条会话）+ 客户端两段式加载。0.2.0 计划与验收见 [docs/PLAN-2026-10-29.md](docs/PLAN-2026-10-29.md) 与 [docs/RELEASE-CHECKLIST-0.2.0.md](docs/RELEASE-CHECKLIST-0.2.0.md)。下一项候选见本文件 Later candidates 与 [docs/HANDOVER-2026-10-29.md](docs/HANDOVER-2026-10-29.md)。
+> 当前：`0.2.2` 开发完成，**待子龙实机验收**（DSH 0.2.2 的独立 fork 适配），验收通过后发布。依据 [docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md](docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md) 与 [docs/PLAN-2026-11-05-dsh-0.2.2-compat.md](docs/PLAN-2026-11-05-dsh-0.2.2-compat.md)。0.2.1 与 0.2.0 已发布，记录见下方章节。
 
 ## 0.1.0 — delivered
 
@@ -39,6 +39,22 @@
 - 操作结果改为浮动 toast：成功提示 5 秒自动消失，失败/带操作提示保留。
 - 头部三个按钮移到会话管理标题右侧；副标题与统计信息独占下方整行。
 - 空会话：「归档空会话（N）」一键分批归档；「清理空会话（N）」只要有已归档空会话就显示；删除范围预览与删除按 `maxBatch` 分批，超过 50 条也能一次确认完成。
+
+## 0.2.2 — 待验收 (dev complete)
+
+适配 DSH 0.2.2-rc.1 的「普通 fork 是独立会话」变化：fork 不再写 `parentSession`。
+
+- 分类器改为「父 id 或 `isSeeded`」双判据：新 fork 仍识别为分支（徽标 + 「来源未记录」，不缩进，可单独移动），历史 fork 行为不变；子代理仍按 `origin`/`delegationDepth` 优先判定。
+- Wire 行新增 `forkLineage: 'recorded' | 'none' | null`（纯加法）；`can.move` 对无来源 fork 放开。
+- live 投影读取从 `@deprecated` 的 `sessionProjections.cachedSnapshot()` 迁到 `snapshot()`，旧宿主回退原实现。
+- 移除会话管理头部的「刷新页面」按钮（整页刷新交给浏览器；一键入口挪到自用 `dsh-zl-tools` 的 zTools 页）。
+- 兼容矩阵增加 `0.2.2-rc.1` / `0.2.1-rc.5`；136 测试全绿。
+- 计划与发布记录见 [docs/PLAN-2026-11-05-dsh-0.2.2-compat.md](docs/PLAN-2026-11-05-dsh-0.2.2-compat.md)、[docs/RELEASE-CHECKLIST-0.2.2.md](docs/RELEASE-CHECKLIST-0.2.2.md)。
+
+## 0.2.1 — delivered (published)
+
+- 整枝移动：根会话的子代理后代随根迁移，先整体校验、逐个迁移、失败逆序回滚；普通分支（fork）仍不跟随。
+- 批量失败 toast 显示每条原因；头部「刷新页面」按钮；带操作按钮的成功提示也会自动消失。
 
 ## 0.2.0 — delivered (published)
 

@@ -211,6 +211,81 @@ test('classification, parent annotation and fork counts follow the listing rules
   assert.equal(shown.entries.get('root').forkCount, 1)
 })
 
+test('a seeded header without a recorded parent is a source-less fork', async () => {
+  const headers = new Map([
+    ['plain', header('plain', { cwd: '/a', createdAt: 1 })],
+    ['seeded', header('seeded', { cwd: '/a', createdAt: 2, isSeeded: true })],
+    ['hist', header('hist', { cwd: '/a', createdAt: 3, isSeeded: true, parentSession: 'plain' })],
+    ['sub', header('sub', { cwd: '/a', createdAt: 4, parentSession: 'plain', origin: 'subagent', delegationDepth: 1 })],
+  ])
+  const ctx = makeCtx({
+    headers,
+    workspaces: [{ id: 'a', path: '/a', sessionIds: ['plain', 'seeded', 'hist', 'sub'] }],
+  })
+  const catalog = await fromContext(ctx, config, {})
+  const seeded = catalog.entries.get('seeded')
+  assert.equal(seeded.kind, 'fork')
+  assert.equal(seeded.isFork, true)
+  assert.equal(seeded.forkLineage, 'none')
+  assert.equal(seeded.parentSessionId, null)
+  assert.equal(seeded.parentTitle, '')
+  assert.equal(seeded.parentPresent, false)
+  assert.equal(seeded.forkCount, 0)
+  assert.equal(seeded.can.move, true)
+  assert.equal(catalog.entries.get('plain').forkCount, 1)
+  assert.equal(catalog.entries.get('plain').forkLineage, null)
+  assert.equal(publicRow(seeded).forkLineage, 'none')
+  // A historical fork keeps the recorded shape and the old move rule; a
+  // subagent stays hidden by default.
+  const historical = catalog.entries.get('hist')
+  assert.equal(historical.kind, 'fork')
+  assert.equal(historical.forkLineage, 'recorded')
+  assert.equal(historical.parentSessionId, 'plain')
+  assert.equal(historical.can.move, false)
+  assert.equal(catalog.hiddenSubagents, 1)
+  assert.equal(catalog.entries.has('sub'), false)
+})
+
+test('live projection reads prefer snapshot() over the deprecated cachedSnapshot()', async () => {
+  const live = [{ id: 's1', header: header('s1'), seq: 1 }]
+  const ctx = makeCtx({ headers: new Map([['s1', header('s1')]]), live })
+  const calls = []
+  const originalGet = ctx.get
+  ctx.get = (name) => {
+    if (name !== 'sessionProjections') return originalGet(name)
+    return {
+      snapshot(session, keys) {
+        calls.push(['snapshot', session.id, ...keys])
+        return block({ title: 'Snap title' })
+      },
+      cachedSnapshot() {
+        calls.push(['cachedSnapshot'])
+        return block({ title: 'Stale title' })
+      },
+    }
+  }
+  const catalog = await fromContext(ctx, config, {})
+  assert.equal(calls[0][0], 'snapshot')
+  assert.equal(calls[0][1], 's1')
+  assert.equal(catalog.entries.get('s1').title, 'Snap title')
+
+  const legacy = makeCtx({ headers: new Map([['s1', header('s1')]]), live })
+  const legacyCalls = []
+  const legacyGet = legacy.get
+  legacy.get = (name) => {
+    if (name !== 'sessionProjections') return legacyGet(name)
+    return {
+      cachedSnapshot() {
+        legacyCalls.push('cachedSnapshot')
+        return block({ title: 'Legacy title' })
+      },
+    }
+  }
+  const legacyCatalog = await fromContext(legacy, config, {})
+  assert.deepEqual(legacyCalls, ['cachedSnapshot'])
+  assert.equal(legacyCatalog.entries.get('s1').title, 'Legacy title')
+})
+
 test('archived, pinned, workspace membership and orphans', async () => {
   const headers = new Map([
     ['s1', header('s1', { cwd: '/a' })],
