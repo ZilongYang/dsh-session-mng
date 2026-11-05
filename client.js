@@ -182,6 +182,17 @@ window.__ModuleLoader__.load({
         orphanBanner: '有 {n} 条归档记录对应的日志已经不存在。',
         cleanupOrphans: '清理失效归档记录',
         cleaningOrphans: '正在清理…',
+        misplacedBanner: '发现 {n} 个会话的工作目录属于某个工作区，但工作区账本里没有它们，因此左侧栏看不到。',
+        misplacedTruncated: '本次最多处理 {n} 个，其余请修复后再点一次。',
+        repairAttach: '一键归位',
+        repairing: '正在归位…',
+        repairDone: '已归位 {n} 个会话，左侧栏应立即出现。',
+        repairAlready: '这些会话本来就在工作区账本里。',
+        repairUnlisted: '已补回工作区账本，但宿主会话列表仍未返回 {n} 个会话：左侧栏暂时看不到，需要重启 DSH 后再试。',
+        misplacedBadge: '未归位',
+        misplacedBadgeHint: '该会话的 cwd 属于当前工作区，但工作区账本没有登记它，所以左侧栏不显示；可用「一键归位」修复。',
+        repairNoMatch: '该会话的 cwd 不匹配任何工作区目录，无法归位。',
+        repairUnverified: '补写工作区账本后校验未通过，请重试或重启 DSH。',
         cleanedOrphans: '已清理 {n} 条失效归档记录。',
         forbidden: '本机未授权该请求（插件路由需要 loopback 或受信任主机）。',
         unavailable: '插件 Host 侧不可用，请确认已安装并在当前 profile 中启用。',
@@ -360,6 +371,17 @@ window.__ModuleLoader__.load({
         orphanBanner: '{n} archived ids no longer have a stored log.',
         cleanupOrphans: 'Clean stale archive markers',
         cleaningOrphans: 'Cleaning…',
+        misplacedBanner: '{n} sessions name a workspace directory but their workspace ledger entry is missing, so the sidebar cannot show them.',
+        misplacedTruncated: 'At most {n} are repaired per click; repair again for the rest.',
+        repairAttach: 'Reattach to workspace',
+        repairing: 'Reattaching…',
+        repairDone: 'Reattached {n} sessions; the sidebar should show them now.',
+        repairAlready: 'These sessions are already accounted for by their workspace.',
+        repairUnlisted: 'The workspace ledger was fixed, but the host session list still omits {n} sessions, so the sidebar stays empty until DSH restarts.',
+        misplacedBadge: 'No workspace entry',
+        misplacedBadgeHint: 'This session names the current workspace directory, but the workspace ledger does not account for it, so the sidebar hides it. Use "Reattach to workspace".',
+        repairNoMatch: 'This session\'s cwd matches no workspace directory, so it cannot be reattached.',
+        repairUnverified: 'The workspace ledger did not read back after the write; retry or restart DSH.',
         cleanedOrphans: 'Cleaned {n} stale archive markers.',
         forbidden: 'This request is not authorized (the plugin route needs a loopback or trusted host).',
         unavailable: 'The plugin Host half is unavailable; make sure it is installed and enabled in this profile.',
@@ -630,6 +652,9 @@ window.__ModuleLoader__.load({
       if (code === 'timeout') return t('timeout')
       if (code === 'llm-error') return t('llmError', { message: error?.message ?? '' })
       if (code === 'session-active') return t('sessionActive')
+      if (code === 'session-subagent') return t('subagent')
+      if (code === 'no-workspace-match') return t('repairNoMatch')
+      if (code === 'repair-unverified') return t('repairUnverified')
       return error?.message || t('failedGeneric', { message: '' })
     }
 
@@ -673,6 +698,9 @@ window.__ModuleLoader__.load({
 
     const getBlanks = (includeSubagents, signal) =>
       request('GET', `/blanks?subagents=${includeSubagents ? '1' : '0'}`, undefined, signal)
+
+    const getMisplaced = (includeSubagents, signal) =>
+      request('GET', `/misplaced?subagents=${includeSubagents ? '1' : '0'}`, undefined, signal)
 
     const getSizes = (workspaceId, includeSubagents, signal) =>
       request(
@@ -810,6 +838,11 @@ window.__ModuleLoader__.load({
         )
       }
       if (row.isSubagent) badges.push(h(Badge, { key: 'sub', tone: 'warn' }, t('subagent')))
+      // The sidebar renders a Workspace from its ledger only; this row names
+      // the directory but is missing from it, so it is invisible there.
+      if (row.membership === 'cwd') {
+        badges.push(h(Badge, { key: 'misplaced', tone: 'warn', title: t('misplacedBadgeHint') }, t('misplacedBadge')))
+      }
       if (forkCount > 0) {
         badges.push(
           h('span', { key: 'children', title: t('forkCountHint', { n: forkCount }) },
@@ -1265,7 +1298,7 @@ window.__ModuleLoader__.load({
     // Detail view
     // ---------------------------------------------------------------------
 
-    function DetailView({ ctx, t, overview, limits, row, busy, onBack, onChanged, onOpen, onArchive, onRestore, onMove, onDelete }) {
+    function DetailView({ ctx, t, overview, limits, row, busy, onBack, onChanged, onOpen, onArchive, onRestore, onMove, onDelete, onRepair }) {
       const [copied, setCopied] = React.useState(false)
       const [showDelete, setShowDelete] = React.useState(false)
       const deleteIds = React.useMemo(() => [row.id], [row.id])
@@ -1317,6 +1350,9 @@ window.__ModuleLoader__.load({
                 ? h(Badge, { tone: 'brand', title: row.forkLineage === 'none' ? t('branchSourceUnknownHint') : undefined }, t('branch'))
                 : null,
               row.isSubagent ? h(Badge, { tone: 'warn' }, t('subagent')) : null,
+              row.membership === 'cwd'
+                ? h(Badge, { tone: 'warn', title: t('misplacedBadgeHint') }, t('misplacedBadge'))
+                : null,
             ),
           ),
           h('div', { className: 'dsm-actions' },
@@ -1326,6 +1362,9 @@ window.__ModuleLoader__.load({
             row.archived
               ? h('button', { type: 'button', className: 'dsm-btn primary', disabled: busy, onClick: () => onRestore(row.id) }, t(canOpen ? 'restoreAndOpen' : 'restoreAction'))
               : h('button', { type: 'button', className: 'dsm-btn', disabled: busy, onClick: () => onArchive(row.id) }, t('archiveAction')),
+            row.can?.repair === true
+              ? h('button', { type: 'button', className: 'dsm-btn', disabled: busy, onClick: () => onRepair(row.id) }, t('repairAttach'))
+              : null,
           ),
         ),
         h(
@@ -1879,6 +1918,8 @@ window.__ModuleLoader__.load({
       const [pages, setPages] = React.useState(() => new Map())
       const [rowCache, setRowCache] = React.useState(() => new Map())
       const [blanks, setBlanks] = React.useState(null)
+      // Repair candidates: rows whose cwd names a Workspace the ledger forgot.
+      const [misplaced, setMisplaced] = React.useState(null)
       const [sizes, setSizes] = React.useState(null)
       const [sizesPhase, setSizesPhase] = React.useState('idle')
       const [searchPhase, setSearchPhase] = React.useState('idle')
@@ -1893,6 +1934,7 @@ window.__ModuleLoader__.load({
       const searchRef = React.useRef(null)
       const listScroll = React.useRef(0)
       const overviewAbort = React.useRef(null)
+      const misplacedAbort = React.useRef(null)
       const sizesAbort = React.useRef(null)
       const searchAbort = React.useRef(null)
       const detailAbort = React.useRef(null)
@@ -1932,6 +1974,25 @@ window.__ModuleLoader__.load({
         } catch {
           // The shortcuts degrade to hidden buttons when /blanks is unavailable.
           setBlanks(null)
+        }
+      }
+
+      /**
+       * Repair candidates: sessions whose cwd names a Workspace the ledger no
+       * longer lists. Out of band like sizes — an old Host without the route
+       * simply never shows the banner.
+       */
+      const loadMisplaced = async () => {
+        misplacedAbort.current?.abort()
+        const controller = new AbortController()
+        misplacedAbort.current = controller
+        try {
+          const value = await getMisplaced(includeSubagentsRef.current, controller.signal)
+          if (controller.signal.aborted) return
+          setMisplaced(value ?? null)
+        } catch (failure) {
+          if (failure?.name === 'AbortError') return
+          setMisplaced(null)
         }
       }
 
@@ -1975,6 +2036,7 @@ window.__ModuleLoader__.load({
               setOverviewPhase('ready')
               setOverviewError(null)
               void loadBlanks()
+              void loadMisplaced()
               return
             } catch (failure) {
               if (failure?.name === 'AbortError') return
@@ -1990,6 +2052,7 @@ window.__ModuleLoader__.load({
           setLegacyState(value)
           setOverview(overviewFromState(value))
           setBlanks(blanksFromState(value))
+          setMisplaced(null)
           setOverviewPhase('ready')
           setOverviewError(null)
         } catch (failure) {
@@ -2555,6 +2618,60 @@ window.__ModuleLoader__.load({
         }
       }
 
+      /**
+       * Reattach missing-membership sessions to the Workspace their cwd names.
+       *
+       * This is a ledger-only write on the Host (no session byte changes), and
+       * the Workspace feed pushes the new `sessionIds` to every connected
+       * client, so the sidebar updates without a restart. A row the Host's own
+       * session list still omits is reported honestly instead of claiming a
+       * fixed sidebar.
+       */
+      const repairMisplaced = async (explicitIds) => {
+        const ids = Array.isArray(explicitIds) ? explicitIds : (misplaced?.rows ?? []).map((row) => row.id)
+        if (ids.length === 0) return
+        setBusy(true)
+        setNotice(null)
+        try {
+          let fixed = 0
+          let already = 0
+          let unlisted = 0
+          const failures = []
+          for (let index = 0; index < ids.length; index += maxBatch) {
+            const value = await post('repair', { sessionIds: ids.slice(index, index + maxBatch) })
+            for (const item of value?.results ?? []) {
+              if (item.ok !== true) {
+                failures.push(item)
+                continue
+              }
+              if (item.already === true) already += 1
+              else {
+                fixed += 1
+                if (item.listed === false) unlisted += 1
+              }
+            }
+          }
+          const parts = []
+          if (fixed > 0) parts.push(t('repairDone', { n: fixed }))
+          if (already > 0) parts.push(t('repairAlready'))
+          if (unlisted > 0) parts.push(t('repairUnlisted', { n: unlisted }))
+          if (failures.length === 0) {
+            setNotice({ tone: unlisted > 0 ? 'error' : 'ok', text: parts.join(' ') || t('repairAlready') })
+          } else {
+            setNotice({
+              tone: 'error',
+              text: t('batchDone', { ok: fixed + already, failed: failures.length }),
+              details: failures.slice(0, 20),
+            })
+          }
+          await refresh()
+        } catch (failure) {
+          setNotice({ tone: 'error', text: errorText(t, failure) })
+        } finally {
+          setBusy(false)
+        }
+      }
+
       const cleanupOrphans = async () => {
         const ids = overview?.orphans ?? []
         if (ids.length === 0) return
@@ -2743,6 +2860,7 @@ window.__ModuleLoader__.load({
             onRestore: (id) => void restoreAndOpen(id),
             onMove: (id, target) => void moveRows([id], target),
             onDelete: (ids) => void deleteRows(ids),
+            onRepair: (id) => void repairMisplaced([id]),
           }),
         )
       }
@@ -2817,6 +2935,20 @@ window.__ModuleLoader__.load({
               h('div', { className: 'dsm-note-actions' },
                 h('button', { type: 'button', className: 'dsm-btn', disabled: busy, onClick: () => void cleanupOrphans() },
                   busy ? t('cleaningOrphans') : t('cleanupOrphans')),
+              ),
+            )
+          : null,
+        (misplaced?.count ?? 0) > 0
+          ? h(
+              'div',
+              { className: 'dsm-note warn' },
+              h('div', { style: { flex: '1 1 auto' } },
+                t('misplacedBanner', { n: misplaced.count }),
+                misplaced.truncated === true ? ` ${t('misplacedTruncated', { n: misplaced.rows?.length ?? 0 })}` : '',
+              ),
+              h('div', { className: 'dsm-note-actions' },
+                h('button', { type: 'button', className: 'dsm-btn primary', disabled: busy, onClick: () => void repairMisplaced() },
+                  busy ? t('repairing') : t('repairAttach')),
               ),
             )
           : null,

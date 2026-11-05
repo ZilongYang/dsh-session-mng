@@ -29,6 +29,7 @@
 - **彻底删除已归档会话**：删除前先预览范围（根会话、子代理会话、目录、字节数）；确认后把日志目录移出 store、清理归档集合与 workspace 账本，再删除。**不可恢复。** 子代理会话随父级联删除；**普通分支会话不会**（它们仍是独立会话，来源父会话删除后保留下来），如需一并删除请把分支也勾选进来。
 - **预览最近消息**：不恢复会话即可看最近 10 条用户/助手消息。
 - **失效归档标记清理**：归档集合里有、但磁盘上已无日志的 id，会以横幅提示并允许清理。
+- **工作区归属自检 + 一键归位**：左侧栏只渲染工作区账本里的会话，所以「右边能看到、左边栏看不到」这种不同步，根因通常是会话的 `cwd` 属于某工作区但账本 `sessionIds` 里漏了它。会话管理页会检测这类会话：横幅提示 + 「一键归位」按钮（行上带「未归位」徽标，详情页也有同样按钮）。归位只写账本、不改会话日志，live/archived 都安全；若宿主自己的会话列表仍不返回它，会明确提示需要重启后再试。
 - **中英双语**、浅色/深色主题跟随宿主。
 
 ![Expanded workspace](assets/screenshot-4-expanded.png)
@@ -76,15 +77,16 @@ Host 半是进程内模块：装完如果看不到页面，重启一次 dsh/应�
 Settings page (client.js)
       │  GET  /session-mng/api/overview                 ← 首屏：只有计数，没有会话行
       │  GET  /session-mng/api/sessions?...             ← 每个展开的工作区一页（≤50 行）
-      │  GET  /session-mng/api/{search,session,blanks,sizes}
+      │  GET  /session-mng/api/{search,session,blanks,misplaced,sizes}
       │  GET  /session-mng/api/state                    ← 0.1.x 兼容 / 老 Host 回退
-      │  POST /session-mng/api/{preview,title/propose,title/apply,archive,unarchive,delete/preview,delete,move}
+      │  POST /session-mng/api/{preview,title/propose,title/apply,archive,unarchive,delete/preview,delete,move,repair}
       ▼
 Host route (lib/api.js) ──► service (lib/service.js)
       ├─ catalog      : workspaceRegistry.headers + sessionProjectionCache（零会话日志 IO；seam 缺失回退 buildState 慢路径）
       ├─ state        : buildState 慢路径 / sessionController + sessionQuery + workspaceRegistry + sessionPersistence
       ├─ title        : sessionQuery.readSurface → ctx.llm.stream → 确认后写 session/title 事件
       ├─ archive      : workspaceRegistry.archiveSession / unarchiveSession
+      ├─ repair       : 工作区账本自检 + attachSession（纯账本写，不改会话字节；cwd 校验）
       ├─ move         : 日志 header cwd 重写 + 目录迁移 + workspace 缓存对账（失败全回滚）
       └─ delete       : 删除范围预览 → 目录移入临时区 → 清理账本 → 删除（失败回滚）
 ```
@@ -158,6 +160,7 @@ npm --cache /tmp/dsh-npm-cache pack --dry-run
 
 ## 当前状态与下一步
 
+- `0.2.3` **验收已通过，待发版（2026-11-06）**：新增**工作区归属自检 + 一键归位**——左侧栏只渲染工作区账本里的会话，账本漏登记时会出现「右边有、左边没有」，现在会话管理页会检测并用一个按钮把会话挂回 `cwd` 对应的账本（纯账本写、不改日志，live/archived 都安全）；宿主列表仍缺时会明确提示需重启。实机验收：点按钮后左侧栏**即时**出现，账本 `sessionIds` 10 → 12。144 个测试全绿，见 [发布检查清单](docs/RELEASE-CHECKLIST-0.2.3.md)。
 - `0.2.2` 已发布到 npm / GitHub / Release（2026-11-05）：**移除「刷新页面」按钮**（跨工作区移动后请手动刷新页面；该一键刷新已挪到自用的 zTools 插件的设置页）；**适配 DSH 0.2.2 的「独立 fork」变化**——普通 fork 不再写 `parentSession`，插件改用 `isSeeded` 兜底识别分支：新分支显示「分支」徽标 + 「来源未记录」、允许单独移动，历史分支行为不变；`sessionProjections` 读取从已废弃的 `cachedSnapshot()` 迁到 `snapshot()`；兼容矩阵增加 `0.2.2-rc.1` / `0.2.1-rc.5`。136 个测试全绿。见 [兼容性核查](docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md) 与 [实施计划](docs/PLAN-2026-11-05-dsh-0.2.2-compat.md)。
 - `0.2.1` 已发布到 npm / GitHub / Release（2026-11-02）：**整枝移动**（根会话的子代理会话随根会话一起迁移，先整体校验、逐个迁移、失败逆序回滚；普通分支仍不跟随）、批量失败 toast 显示每条原因、头部「刷新页面」按钮（整页重载）、带操作按钮的成功提示也会自动消失。131 个测试全绿。
 - `0.2.0` 已发布到 npm / GitHub / Release（2026-10-29）：Host 侧新增零会话日志 IO 的会话 catalog 与 7 条只读路由（`/overview`、`/sessions`、`/search`、`/session`、`/blanks`、`/sizes`，`/state` 保留）；首屏只取概览，工作区展开才按 50 条一页取行；搜索改由宿主完成；选择只作用于已加载行；详情独立取数不再被刷新踢出；分支跨页不再误报父会话已删除。10000 条合成基准：overview ≈ 10 ms / 1.3 KB，单页 50 行 ≈ 9 ms。129 个测试全绿（Host 72 + 客户端 vm 57）。
@@ -175,6 +178,7 @@ npm --cache /tmp/dsh-npm-cache pack --dry-run
 - [DSH 0.2.2-rc.1 兼容性核查](docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md)
 - [0.2.2 实施计划（DSH 0.2.2 兼容：独立 fork）](docs/PLAN-2026-11-05-dsh-0.2.2-compat.md)
 - [0.2.2 发布检查清单](docs/RELEASE-CHECKLIST-0.2.2.md)
+- [0.2.3 发布检查清单](docs/RELEASE-CHECKLIST-0.2.3.md)
 - [0.2.1 发布检查清单](docs/RELEASE-CHECKLIST-0.2.1.md)
 - [整枝移动实施计划（父会话 + 子代理后代）](docs/PLAN-2026-11-02-family-move.md)
 - [0.2.0 实施计划（overview + 分页 sessions）](docs/PLAN-2026-10-29.md)

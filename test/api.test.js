@@ -15,6 +15,8 @@ function makeService(overrides = {}) {
     deletePreview: async () => ({ roots: [] }),
     remove: async () => ({ totals: {} }),
     move: async () => ({ totals: {} }),
+    misplaced: async () => ({ count: 0, rows: [] }),
+    repair: async () => ({ totals: {} }),
     overview: async () => ({ source: 'catalog', totals: {} }),
     sessions: async () => ({ source: 'catalog', rows: [] }),
     search: async () => ({ source: 'catalog', groups: [] }),
@@ -173,6 +175,7 @@ test('every 0.2.0 read route answers with the value envelope', async () => {
       search: record('search'),
       session: record('session'),
       blanks: record('blanks'),
+      misplaced: record('misplaced'),
       sizes: record('sizes'),
     }),
   })
@@ -182,6 +185,7 @@ test('every 0.2.0 read route answers with the value envelope', async () => {
     ['search', '/session-mng/api/search?query=alpha&limitPerGroup=5'],
     ['session', '/session-mng/api/session?id=s1'],
     ['blanks', '/session-mng/api/blanks?subagents=1'],
+    ['misplaced', '/session-mng/api/misplaced?subagents=1'],
     ['sizes', '/session-mng/api/sizes?workspaceId=all&subagents=1'],
   ]
   for (const [name, url] of urls) {
@@ -189,7 +193,7 @@ test('every 0.2.0 read route answers with the value envelope', async () => {
     assert.equal(result.status, 200, `${name} status`)
     assert.deepEqual(result.body, { ok: true, value: { route: name } }, `${name} envelope`)
   }
-  assert.deepEqual(calls.map((entry) => entry.name), ['overview', 'sessions', 'search', 'session', 'blanks', 'sizes'])
+  assert.deepEqual(calls.map((entry) => entry.name), ['overview', 'sessions', 'search', 'session', 'blanks', 'misplaced', 'sizes'])
   assert.equal(calls[0].params.includeSubagents, true)
   assert.deepEqual(calls[1].params, {
     workspaceId: 'a',
@@ -205,10 +209,31 @@ test('every 0.2.0 read route answers with the value envelope', async () => {
   assert.equal(calls[2].params.query, 'alpha')
   assert.equal(calls[3].params.id, 's1')
   assert.equal(calls[4].params.includeSubagents, true)
-  assert.equal(calls[5].params.workspaceId, 'all')
+  assert.equal(calls[5].params.includeSubagents, true)
+  assert.equal(calls[6].params.workspaceId, 'all')
   // The Client's `/sizes?subagents=…` switch must reach the service untouched.
-  assert.equal(calls[5].params.subagents, '1')
+  assert.equal(calls[6].params.subagents, '1')
   assert.ok(calls[0].params.signal instanceof AbortSignal)
+})
+
+test('POST repair forwards the id list and answers with the value envelope', async () => {
+  const seen = []
+  const handler = makeHandler({
+    service: makeService({
+      repair: async (ids) => {
+        seen.push(ids)
+        return { totals: { requested: ids.length, succeeded: ids.length, failed: 0 }, results: [] }
+      },
+    }),
+  })
+  const result = await call(
+    handler,
+    mockRequest({ method: 'POST', url: '/session-mng/api/repair', body: JSON.stringify({ sessionIds: ['s1', 's2'] }) }),
+  )
+  assert.equal(result.status, 200)
+  assert.deepEqual(seen, [['s1', 's2']])
+  assert.equal(result.body.ok, true)
+  assert.equal(result.body.value.totals.succeeded, 2)
 })
 
 test('the legacy /state route is unchanged', async () => {

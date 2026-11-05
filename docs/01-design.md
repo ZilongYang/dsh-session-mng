@@ -22,6 +22,8 @@
 | `session/title` 是日志事件 | 冷会话可直接 append 官方形状事件；live 会话用 `sessionTitle.rename` |
 | `workspaceRegistry` 缓存 header / canonical path | 移动后必须更新缓存再走公开 `attachSession`/`detachSession` |
 | `sessionController.list` 读完整语料（含已归档） | 总览主来源；失败回退 `sessionQuery.listSessions` |
+| 左侧栏只渲染 `workspace.sessionIds` | 账本漏登记的会话在会话管理里可见、左侧栏不可见（0.2.3 的归属自检据此设计） |
+| `workspace.attachSession` 校验 header `cwd` realpath = workspace path | 归位只写账本；`cwd` 不匹配/目录缺失会明确拒绝 |
 
 ## 3. 模块地图
 
@@ -30,7 +32,7 @@
 | `index.js` | Host 入口：inject、配置归一化、幂等挂载 `/session-mng/api` |
 | `lib/api.js` | HTTP 路由、64 KiB body 上限、错误信封、读请求关闭时取消模型调用 |
 | `lib/fence.js` | loopback / `webRuntime.trustedHosts` / Origin / cross-site 围栏 |
-| `lib/service.js` | 操作层：state、preview、title propose/apply、archive、unarchive、delete preview/remove、move |
+| `lib/service.js` | 操作层：state、preview、title propose/apply、archive、unarchive、delete preview/remove、move、misplaced/repair |
 | `lib/state.js` | 总览组装：摘要 + 持久化快照 + workspace 账本 + 标题回退 + capabilities + orphans |
 | `lib/title.js` | transcript 抽取/预算、路由解析、`llm.stream`、标题清洗与截断 |
 | `lib/store-jsonl.js` | locate/找目录/找当前 generation/header 解析与重写/目录复制/事务/删除 |
@@ -52,11 +54,13 @@
 | `POST /delete/preview` | 删除范围预览（根 + 子代理后代 + 分支提示） |
 | `POST /delete` | `{sessionIds, confirm:true}` |
 | `POST /move` | `{sessionIds, workspaceId}` |
+| `POST /repair` | `{sessionIds}`：把 `cwd` 属于某工作区但账本漏登记的会话 `attachSession` 回账本（纯账本写，不改日志） |
 | `GET /overview?subagents=0\|1` | 首屏概览：工作区计数/归档/空会话、totals、orphans、capabilities、limits；**无会话行** |
 | `GET /sessions?workspaceId=&tab=&query=&sort=&offset=&limit=&subagents=&blank=&sizes=` | 单工作区一页（≤50 行）；branch-aware 排序 + `id` tie-break；`parentStub`/`branchDepth` |
 | `GET /search?query=&…` | 跨工作区标题/路径/id/父标题搜索，每命中组一页 + total |
 | `GET /session?id=` | 详情单行 |
 | `GET /blanks?subagents=` | 空会话三组 id 列表 |
+| `GET /misplaced?subagents=` | 归属自检候选：`cwd` 匹配工作区但不在 `sessionIds` 里的行（≤`maxBatch`，标注 `truncated`） |
 | `GET /sizes?workspaceId=all\|ungrouped\|<id>&subagents=` | 大小统计（一次 `sessionPersistence.list()` + 60 s TTL，只聚合可见行） |
 
 0.2.0 的读面全部是 GET；`/state` 保留给 0.1.x 客户端与老 Host 回退。参数校验失败/未知 workspace 走既有错误信封（`bad-request` / `workspace-not-found`），大小扫描失败返回 503 `sizes-pending`。

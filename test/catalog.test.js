@@ -332,13 +332,13 @@ test('publicRow keeps the 0.1.x row shape', async () => {
   const catalog = await fromContext(ctx, config, {})
   const row = publicRow(catalog.entries.get('s1'))
   for (const key of [
-    'id', 'title', 'cwd', 'workspaceId', 'archived', 'pinned', 'live', 'running', 'blank', 'kind',
+    'id', 'title', 'cwd', 'workspaceId', 'membership', 'archived', 'pinned', 'live', 'running', 'blank', 'kind',
     'isFork', 'isSubagent', 'parentSessionId', 'parentTitle', 'parentPresent', 'forkCount',
     'agentPreset', 'createdAt', 'updatedAt', 'sizeBytes', 'can',
   ]) {
     assert.ok(Object.hasOwn(row, key), `row is missing "${key}"`)
   }
-  assert.deepEqual(Object.keys(row.can).sort(), ['archive', 'delete', 'move', 'open', 'restore', 'title'])
+  assert.deepEqual(Object.keys(row.can).sort(), ['archive', 'delete', 'move', 'open', 'repair', 'restore', 'title'])
 })
 
 test('a host without the in-memory seams falls back to buildState', async () => {

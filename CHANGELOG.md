@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.3 — 2026-11-06
+
+### Added
+
+- **工作区归属自检 + 「一键归位」**：左侧栏只渲染工作区账本（`workspaceRegistry` 的 `sessionIds`）里的会话；当某会话的 header `cwd` 明明属于某个工作区、但账本里没有它时（典型症状：**右边会话管理能看到、左边栏看不到**），会话管理页会显示横幅并给出「一键归位」按钮；这类行带「未归位」徽标，详情页也有「一键归位」按钮。
+  - 归位是**纯账本写操作**：`attachSession` 先校验 header `cwd`（realpath）与工作区目录一致、目录存在，再把这个 id 加回 `sessionIds`；**不改会话日志一个字节**，live / archived 会话都安全；
+  - 归位后宿主会把新的 Workspace 快照推给所有已连接客户端，侧栏通常即时出现；若宿主自己的 `session.list` 仍不返回该会话，提示会明确写「需重启后再试」，不假装成功；
+  - 新只读路由 `GET /misplaced`（候选 id 列表，受 `maxBatch` 限制并标注 `truncated`）与新写路由 `POST /repair`；`/overview` 的 `totals` 新增 `misplaced` 计数；行新增 `membership: 'ledger' | 'cwd' | 'none'` 与 `can.repair`（纯加法）。
+  - 子代理会话从不作为归位候选（它们由父会话的 catalog 管辖）；`cwd` 不匹配任何工作区、工作区目录不存在、未知 id、子代理分别返回 `no-workspace-match` / `workspace-missing` / `not-found` / `session-subagent`。
+
+### Compatibility
+
+- 144 个测试全绿（新增 8 条：membership 分类、overview `misplaced` 计数、repair 幂等、宿主列表缺失诚实上报、无匹配、子代理、目录缺失、未知 id，以及 `/misplaced` 与 `POST /repair` 路由）。
+- 未改变既有 wire 形状：新增字段全部是加法，旧 Client 不受影响。
+- 实机验收（子龙，2026-11-06，桌面 App）：重启后横幅出现 → 点「一键归位」→ **左侧栏当场出现该会话（无需重启）**；账本 `sessionIds` 10 → 12，见 [0.2.3 发布检查清单](docs/RELEASE-CHECKLIST-0.2.3.md)。
+
 ## 0.2.2 — 2026-11-05
 
 ### Changed
