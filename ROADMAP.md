@@ -1,6 +1,6 @@
 # Roadmap
 
-> 当前：`0.2.2` 开发完成，**待子龙实机验收**（DSH 0.2.2 的独立 fork 适配），验收通过后发布。依据 [docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md](docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md) 与 [docs/PLAN-2026-11-05-dsh-0.2.2-compat.md](docs/PLAN-2026-11-05-dsh-0.2.2-compat.md)。0.2.1 与 0.2.0 已发布，记录见下方章节。
+> 当前：`0.2.2` 已发布（npm latest / tag `v0.2.2` / Release，2026-11-05）：DSH 0.2.2 的独立 fork 适配 + 投影读取迁移 + 移除「刷新页面」按钮。依据 [docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md](docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md) 与 [docs/PLAN-2026-11-05-dsh-0.2.2-compat.md](docs/PLAN-2026-11-05-dsh-0.2.2-compat.md)。0.2.1 与 0.2.0 已发布，记录见下方章节。
 
 ## 0.1.0 — delivered
 
@@ -40,7 +40,7 @@
 - 头部三个按钮移到会话管理标题右侧；副标题与统计信息独占下方整行。
 - 空会话：「归档空会话（N）」一键分批归档；「清理空会话（N）」只要有已归档空会话就显示；删除范围预览与删除按 `maxBatch` 分批，超过 50 条也能一次确认完成。
 
-## 0.2.2 — 待验收 (dev complete)
+## 0.2.2 — delivered (published)
 
 适配 DSH 0.2.2-rc.1 的「普通 fork 是独立会话」变化：fork 不再写 `parentSession`。
 
