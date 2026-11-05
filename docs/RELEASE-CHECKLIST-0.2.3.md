@@ -44,7 +44,7 @@
 
 - [x] Git：commit `8872297`，main push（`90aba6a..8872297`），tag `v0.2.3`（annotated），GitHub Release <https://github.com/ZilongYang/dsh-session-mng/releases/tag/v0.2.3>
 - [x] `npm publish`：+ dsh-session-mng@0.2.3，47 个文件 / 658.4 kB（unpacked 1.1 MB），shasum `5dd0a79529ca0c61264f96e8d513adaf118582c5`；`npm view` 已确认 `latest = 0.2.3`（registry 异步处理，约 2 分钟后可读）。
-- [ ] 站点 `dsh.zlmix.com/session-mng/` 更新到 0.2.3
+- [x] 站点 `dsh.zlmix.com/session-mng/` 已更新到 0.2.3（站点仓库 commit `0f37da7`，发布备份 `/opt/1panel/www/sites/dsh.zlmix.com/backups/20261106-030011`；线上 `/`、`/session-mng/` 等 7 条路由 200，线上 `index.html` sha256 与本地一致 `b6c62f55…`，首页/session-mng 页面 `data-version` 均为 0.2.3；服务器自检 0 error / 3 warning（服务器无同级插件仓库，按设计跳过跨仓库核对））
 - [x] README「当前状态」与 ROADMAP 标记已发布
 
 ## D. 已知口径
