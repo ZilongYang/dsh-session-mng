@@ -234,7 +234,7 @@ function makeRegistry(workspaces, archived = [], options = {}) {
   return registry
 }
 
-async function makeFixture() {
+async function makeFixture(options = {}) {
   if (!HAS_ZSTD) return undefined
   const base = await mkdtemp(join(tmpdir(), 'dsh-session-mng-svc-'))
   const root = join(base, 'sessions')
@@ -244,7 +244,7 @@ async function makeFixture() {
   const sourceDir = join(root, projectKey(oldCwd), id)
   await mkdir(sourceDir, { recursive: true })
   const header = { type: 'session', version: 4, id, createdAt: 1, cwd: oldCwd, isSeeded: false, agentPreset: 'standard' }
-  const events = [
+  const events = options.events ?? [
     { type: 'user/message', seq: 0, time: 1, data: { content: [{ type: 'text', text: 'hello' }] } },
     { type: 'assistant/message', seq: 1, time: 2, data: { message: { content: [] } } },
   ]
@@ -270,6 +270,7 @@ async function makeFixture() {
       return this[name]
     },
   }
+  Object.assign(ctx, options.services ?? {})
   return { base, root, oldCwd, newCwd, id, sourceDir, oldWorkspace, newWorkspace, registry, ctx }
 }
 
@@ -502,6 +503,101 @@ test('cold title apply appends the official session/title event', { skip: !HAS_Z
     const title = lines.find((line) => line.type === 'session/title')
     assert.ok(title)
     assert.deepEqual(title.data, { title: 'Cold title', messageSeqs: [], source: { kind: 'user' } })
+  } finally {
+    await rm(fixture.base, { recursive: true, force: true })
+  }
+})
+
+test('preview reports conversation only and counts injected messages', { skip: !HAS_ZSTD }, async () => {
+  const fixture = await makeFixture({
+    events: [
+      {
+        type: 'user/message',
+        seq: 0,
+        time: 1,
+        data: {
+          role: 'user',
+          content: [{ type: 'text', text: 'the real question' }],
+          source: { kind: 'user', rpcId: 'r1' },
+        },
+      },
+      {
+        type: 'assistant/message',
+        seq: 1,
+        time: 2,
+        data: { message: { content: [{ type: 'text', text: 'the answer' }] } },
+      },
+      {
+        type: 'user/message',
+        seq: 2,
+        time: 3,
+        data: {
+          role: 'user',
+          content: [{ type: 'text', text: 'Time sampled while preparing turn 1' }],
+          source: { kind: 'time-context', form: 'snapshot' },
+        },
+      },
+      {
+        type: 'user/message',
+        seq: 3,
+        time: 4,
+        data: {
+          role: 'user',
+          content: [{ type: 'text', text: 'MNEMON RUNTIME MEMORY SNAPSHOT' }],
+          source: { kind: 'dsh-mnemon', form: 'memory-snapshot' },
+        },
+      },
+    ],
+  })
+  try {
+    const service = createService(fixture.ctx, normalizeConfig({ sessionsRoot: fixture.root }))
+    const value = await service.preview(fixture.id, 10)
+    assert.deepEqual(value.messages.map((message) => message.role), ['user', 'assistant'])
+    assert.deepEqual(value.messages.map((message) => message.text), ['the real question', 'the answer'])
+    assert.equal(value.skipped, 2)
+  } finally {
+    await rm(fixture.base, { recursive: true, force: true })
+  }
+})
+
+test('unarchive reports the worktrees its archive removed', { skip: !HAS_ZSTD }, async () => {
+  const fixture = await makeFixture({
+    events: [
+      {
+        type: 'plugin:worktree/created',
+        seq: 0,
+        time: 1,
+        ignorable: true,
+        data: { path: '/tmp/dsm-wt', branch: 'feat', baseCommit: 'c0', repositoryRoot: '/repo' },
+      },
+      {
+        type: 'user/message',
+        seq: 1,
+        time: 2,
+        data: { content: [{ type: 'text', text: 'hello' }] },
+      },
+    ],
+    services: { worktrees: {} },
+  })
+  try {
+    const service = createService(fixture.ctx, normalizeConfig({ sessionsRoot: fixture.root }))
+    const value = await service.unarchive([fixture.id])
+    assert.equal(value.totals.succeeded, 1)
+    assert.equal(value.worktrees.supported, true)
+    assert.equal(value.worktrees.totals.worktrees, 1)
+    assert.deepEqual(value.worktrees.rows[0].worktrees, [{ path: '/tmp/dsm-wt', branch: 'feat' }])
+  } finally {
+    await rm(fixture.base, { recursive: true, force: true })
+  }
+})
+
+test('the worktree preview is unsupported without the worktree service', { skip: !HAS_ZSTD }, async () => {
+  const fixture = await makeFixture()
+  try {
+    const service = createService(fixture.ctx, normalizeConfig({ sessionsRoot: fixture.root }))
+    const value = await service.worktrees([fixture.id])
+    assert.equal(value.supported, false)
+    assert.deepEqual(value.totals, { sessions: 0, worktrees: 0, unknown: 0 })
   } finally {
     await rm(fixture.base, { recursive: true, force: true })
   }

@@ -296,3 +296,22 @@ test('the fence protects the new read routes too', async () => {
   )
   assert.equal(crossSite.status, 403)
 })
+
+test('the worktree preview route forwards the id list', async () => {
+  let received
+  const handler = makeHandler({
+    service: makeService({
+      worktrees: async (ids) => {
+        received = ids
+        return { supported: true, rows: [], totals: { sessions: 0, worktrees: 0, unknown: 0 } }
+      },
+    }),
+  })
+  const result = await call(
+    handler,
+    mockRequest({ method: 'POST', url: '/session-mng/api/worktrees', body: JSON.stringify({ sessionIds: ['a', 'b'] }) }),
+  )
+  assert.equal(result.status, 200)
+  assert.deepEqual(received, ['a', 'b'])
+  assert.equal(result.body.value.supported, true)
+})

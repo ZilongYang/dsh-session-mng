@@ -131,6 +131,7 @@ window.__ModuleLoader__.load({
         preview: '最近消息',
         previewLoading: '正在读取最近消息…',
         previewEmpty: '没有可预览的用户或助手消息。',
+        previewSkipped: '已隐藏 {n} 条系统注入（运行时提醒、技能目录、记忆快照等）。',
         previewFailed: '预览失败：{message}',
         moveTo: '移动到工作区',
         moveHint: '移动会改写会话日志 header 的 cwd，并把日志目录迁到目标工作区；SessionId 与归档状态不变。',
@@ -161,6 +162,15 @@ window.__ModuleLoader__.load({
         archiveAction: '归档',
         archiving: '正在归档…',
         archiveDone: '已归档 {n} 个会话。',
+        archiveWorktreesTitle: '归档会删除工作树检出目录',
+        archiveWorktreesIntro: '以下会话创建过工作树。归档时 DSH 会删除这些检出的干净目录（分支会保留，但未提交的改动与被忽略的文件会丢失）：',
+        archiveWorktreesUnknown: '另有 {n} 个会话无法确认是否创建过工作树（日志较大或为分支会话），归档前请自行确认。',
+        archiveWorktreesKeepHint: '要保留检出目录，请在插件页的工作树行开启「归档时不删除工作树」（retainOnArchive）。',
+        archiveAnyway: '仍然归档',
+        worktreeBadge: '工作树',
+        restoreWorktrees: '该会话曾创建 {n} 个工作树，检出目录已在归档时删除（分支保留）；需要时请用「恢复工作树」重新检出。',
+        worktreeNote: '此会话在归档时会删除 {n} 个工作树检出目录（分支保留）；恢复后可用「恢复工作树」重新检出。',
+        worktreeNoteUnknown: '此会话可能创建过工作树，但日志过大或为分支会话，未能确认；归档前请自行检查 .agents/worktrees。',
         restoreAction: '恢复',
         restoring: '正在恢复…',
         restoreDone: '已恢复 {n} 个会话。',
@@ -320,6 +330,7 @@ window.__ModuleLoader__.load({
         preview: 'Recent messages',
         previewLoading: 'Loading recent messages…',
         previewEmpty: 'No user or assistant text to preview.',
+        previewSkipped: 'Hid {n} injected context messages (runtime reminders, skill catalogs, memory snapshots).',
         previewFailed: 'Preview failed: {message}',
         moveTo: 'Move to workspace',
         moveHint: 'Moving rewrites the session log header cwd and re-homes its directory under the target workspace; the SessionId and archive state stay the same.',
@@ -350,6 +361,15 @@ window.__ModuleLoader__.load({
         archiveAction: 'Archive',
         archiving: 'Archiving…',
         archiveDone: 'Archived {n} sessions.',
+        archiveWorktreesTitle: 'Archiving deletes worktree checkouts',
+        archiveWorktreesIntro: 'These sessions created worktrees. Archiving removes each clean checkout: the branch survives, but uncommitted changes and ignored files do not.',
+        archiveWorktreesUnknown: '{n} more session(s) could not be checked (large log or a fork), so confirm them yourself before archiving.',
+        archiveWorktreesKeepHint: 'To keep the checkouts, turn on "Keep worktrees when archiving" (retainOnArchive) on the worktree row of the Plugins page.',
+        archiveAnyway: 'Archive anyway',
+        worktreeBadge: 'worktree',
+        restoreWorktrees: 'This session created {n} worktree(s); their checkouts were removed when it was archived (branches kept). Use "Restore worktree" when you need them again.',
+        worktreeNote: 'Archiving removes the {n} worktree checkout(s) this session created (branches are kept). "Restore worktree" re-creates them after a restore.',
+        worktreeNoteUnknown: 'This session may have created worktrees, but its log is too large or it is a fork, so nothing was confirmed; check .agents/worktrees yourself before archiving.',
         restoreAction: 'Restore',
         restoring: 'Restoring…',
         restoreDone: 'Restored {n} sessions.',
@@ -1101,6 +1121,7 @@ window.__ModuleLoader__.load({
     function PreviewList({ t, sessionId }) {
       const [phase, setPhase] = React.useState('loading')
       const [messages, setMessages] = React.useState([])
+      const [skipped, setSkipped] = React.useState(0)
       const [error, setError] = React.useState(null)
       React.useEffect(() => {
         const controller = new AbortController()
@@ -1110,6 +1131,7 @@ window.__ModuleLoader__.load({
           .then((value) => {
             if (controller.signal.aborted) return
             setMessages(Array.isArray(value?.messages) ? value.messages : [])
+            setSkipped(Number.isFinite(value?.skipped) ? value.skipped : 0)
             setPhase('ready')
           })
           .catch((failure) => {
@@ -1139,6 +1161,131 @@ window.__ModuleLoader__.load({
                     ),
                   ),
                 ),
+        skipped > 0 ? h('p', { className: 'dsm-hint', style: { margin: '8px 0 0' } },
+          t('previewSkipped', { n: skipped })) : null,
+      )
+    }
+
+    // ---------------------------------------------------------------------
+    // Archive safety net: worktree checkouts the host would delete
+    // ---------------------------------------------------------------------
+
+    /**
+     * One advisory line for an archived session that created worktrees: its
+     * checkout was removed at archive time and restoring does not bring it
+     * back. A failed or unsupported detection renders nothing.
+     */
+    function WorktreeNote({ t, sessionId }) {
+      const [info, setInfo] = React.useState(null)
+      React.useEffect(() => {
+        const controller = new AbortController()
+        post('worktrees', { sessionIds: [sessionId] }, controller.signal)
+          .then((value) => {
+            if (!controller.signal.aborted) setInfo(value ?? null)
+          })
+          .catch(() => {
+            if (!controller.signal.aborted) setInfo(null)
+          })
+        return () => controller.abort()
+      }, [sessionId])
+      const totals = info?.totals
+      if (info?.supported !== true || totals === undefined) return null
+      if (totals.worktrees > 0) {
+        return h('p', { className: 'dsm-hint', style: { margin: '0 0 8px' } },
+          t('worktreeNote', { n: totals.worktrees }))
+      }
+      if (totals.unknown > 0) {
+        return h('p', { className: 'dsm-hint', style: { margin: '0 0 8px' } }, t('worktreeNoteUnknown'))
+      }
+      return null
+    }
+
+    /**
+     * Last chance before an archive that would delete git checkouts.
+     *
+     * Only shown when the detection actually found worktrees (or could not
+     * decide), so ordinary archiving keeps its one-click behaviour.
+     */
+    function ArchiveScope({ t, info, busy, onConfirmed, onCancel }) {
+      React.useEffect(() => {
+        const onKeyDown = (event) => {
+          if (event.key !== 'Escape') return
+          event.preventDefault()
+          event.stopPropagation()
+          if (busy !== true) onCancel()
+        }
+        document.addEventListener('keydown', onKeyDown, true)
+        return () => document.removeEventListener('keydown', onKeyDown, true)
+      }, [busy, onCancel])
+
+      const rows = (info?.rows ?? []).filter((row) => row.count > 0 || row.unknown === true)
+      const unknown = info?.totals?.unknown ?? 0
+      return h(
+        'div',
+        {
+          className: 'dsm-scope-overlay',
+          onMouseDown: (event) => {
+            if (event.target === event.currentTarget && busy !== true) onCancel()
+          },
+        },
+        h(
+          'div',
+          {
+            className: 'dsm-scope-dialog',
+            role: 'dialog',
+            'aria-modal': 'true',
+            'aria-label': t('archiveWorktreesTitle'),
+          },
+          h(
+            'div',
+            { className: 'dsm-scope-head' },
+            h('h3', null, t('archiveWorktreesTitle')),
+            h('button', {
+              type: 'button',
+              className: 'dsm-btn ghost',
+              'aria-label': t('close'),
+              disabled: busy,
+              onClick: onCancel,
+            }, '×'),
+          ),
+          h(
+            'div',
+            { className: 'dsm-scope-body' },
+            h('p', { className: 'dsm-hint', style: { margin: '0 0 8px' } }, t('archiveWorktreesIntro')),
+            h('div', { className: 'dsm-scope-list' },
+              rows.filter((row) => row.count > 0).flatMap((row) =>
+                row.worktrees.map((worktree, index) =>
+                  h(
+                    'div',
+                    { key: `${row.sessionId}-${index}`, className: 'dsm-scope-row' },
+                    h('span', { className: 'dsm-badge' }, t('worktreeBadge')),
+                    h('span', { className: 'dsm-mono', title: worktree.path }, worktree.path),
+                    worktree.branch === '' ? null : h('span', { className: 'dsm-hint' }, worktree.branch),
+                  ),
+                ),
+              ),
+            ),
+            unknown > 0
+              ? h('p', { className: 'dsm-hint', style: { margin: '8px 0 0' } }, t('archiveWorktreesUnknown', { n: unknown }))
+              : null,
+            h('p', { className: 'dsm-hint', style: { margin: '8px 0 0' } }, t('archiveWorktreesKeepHint')),
+          ),
+          h(
+            'div',
+            { className: 'dsm-scope-foot' },
+            h(
+              'div',
+              { className: 'dsm-actions' },
+              h('button', { type: 'button', className: 'dsm-btn', disabled: busy, onClick: onCancel }, t('cancel')),
+              h('button', {
+                type: 'button',
+                className: 'dsm-btn primary',
+                disabled: busy,
+                onClick: onConfirmed,
+              }, t('archiveAnyway')),
+            ),
+          ),
+        ),
       )
     }
 
@@ -1411,6 +1558,7 @@ window.__ModuleLoader__.load({
           ? h(TitleEditor, { ctx, t, session: row, onChanged: () => onChanged(t('apply')) })
           : null,
         h(PreviewList, { t, sessionId: row.id }),
+        row.archived ? h(WorktreeNote, { t, sessionId: row.id }) : null,
         h(
           'section',
           { className: 'dsm-card' },
@@ -1906,6 +2054,8 @@ window.__ModuleLoader__.load({
       const [busy, setBusy] = React.useState(false)
       const [notice, setNotice] = React.useState(null)
       const [bulkDeleteIds, setBulkDeleteIds] = React.useState(null)
+      /** Pending archive that would delete worktree checkouts: { ids, stopActivity, info }. */
+      const [archiveScope, setArchiveScope] = React.useState(null)
       const [bulkTarget, setBulkTarget] = React.useState('')
       // Two-stage data layer: `overview` is the first paint, `pages` holds one
       // lazily loaded page box per workspace, `rowCache` is the only row source
@@ -2553,7 +2703,43 @@ window.__ModuleLoader__.load({
         return family > 0 ? `${base} · ${t('movedWithFamily', { n: family })}` : base
       }
 
-      const archiveRows = async (ids, stopActivity = false) => {
+      /**
+       * Report the git checkouts an archive would delete, in backend-sized
+       * batches. Advisory: any failure yields an unsupported result so the
+       * archive keeps working exactly as before.
+       */
+      const worktreePreview = async (ids) => {
+        const size = Number.isFinite(maxBatch) && maxBatch > 0 ? maxBatch : 50
+        const merged = { supported: false, rows: [], totals: { sessions: 0, worktrees: 0, unknown: 0 } }
+        for (let index = 0; index < ids.length; index += size) {
+          const value = await post('worktrees', { sessionIds: ids.slice(index, index + size) })
+          if (value?.supported === true) merged.supported = true
+          merged.rows.push(...(value?.rows ?? []))
+          merged.totals.worktrees += value?.totals?.worktrees ?? 0
+          merged.totals.unknown += value?.totals?.unknown ?? 0
+        }
+        merged.totals.sessions = merged.rows.length
+        return merged
+      }
+
+      /**
+       * Archive sessions, asking once when the host would delete git checkouts.
+       *
+       * The confirmation only appears when a worktree is actually at stake, so
+       * ordinary archiving keeps its one-click behaviour.
+       */
+      const archiveRows = async (ids, stopActivity = false, options = {}) => {
+        if (options.confirmed !== true) {
+          try {
+            const info = await worktreePreview(ids)
+            if (info.supported && (info.totals.worktrees > 0 || info.totals.unknown > 0)) {
+              setArchiveScope({ ids, stopActivity, info })
+              return undefined
+            }
+          } catch {
+            // The preview is advisory: a failure must not block archiving.
+          }
+        }
         const value = await run(
           () => post('archive', { sessionIds: ids, stopActivity }),
           (result) => resultText(result),
@@ -2570,7 +2756,15 @@ window.__ModuleLoader__.load({
       }
 
       const restoreRows = async (ids) => {
-        return await run(() => post('unarchive', { sessionIds: ids }), () => t('restoreDone', { n: ids.length }))
+        return await run(
+          () => post('unarchive', { sessionIds: ids }),
+          (result) => {
+            const base = t('restoreDone', { n: ids.length })
+            // A restored session does not get its checkout back: say so once.
+            const created = result?.worktrees?.totals?.worktrees ?? 0
+            return created > 0 ? `${base} ${t('restoreWorktrees', { n: created })}` : base
+          },
+        )
       }
 
       const moveRows = async (ids, workspaceId) => {
@@ -3126,6 +3320,19 @@ window.__ModuleLoader__.load({
               onConfirmed: (ids) => void deleteRows(ids),
             })
           : null,
+        archiveScope !== null
+          ? h(ArchiveScope, {
+              t,
+              info: archiveScope.info,
+              busy,
+              onCancel: () => setArchiveScope(null),
+              onConfirmed: () => {
+                const pending = archiveScope
+                setArchiveScope(null)
+                void archiveRows(pending.ids, pending.stopActivity === true, { confirmed: true })
+              },
+            })
+          : null,
         rows.length > 0
           ? rows.map((group) =>
               h(Group, {
@@ -3167,7 +3374,7 @@ window.__ModuleLoader__.load({
         normalizeSizes,
         composeGroups,
         /** Components are exposed only so the vm test can smoke their render bodies. */
-        components: { SessionManagerPage, Row, Group, DetailView },
+        components: { SessionManagerPage, Row, Group, DetailView, ArchiveScope, PreviewList },
       },
       apply(ctx) {
         const t = ctx.locale.bind(NS)

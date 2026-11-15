@@ -34,7 +34,8 @@
 | `lib/fence.js` | loopback / `webRuntime.trustedHosts` / Origin / cross-site 围栏 |
 | `lib/service.js` | 操作层：state、preview、title propose/apply、archive、unarchive、delete preview/remove、move、misplaced/repair |
 | `lib/state.js` | 总览组装：摘要 + 持久化快照 + workspace 账本 + 标题回退 + capabilities + orphans |
-| `lib/title.js` | transcript 抽取/预算、路由解析、`llm.stream`、标题清洗与截断 |
+| `lib/title.js` | transcript 抽取/预算（按 `source.kind` 只认真实对话轮）、路由解析、`llm.stream`、标题清洗与截断 |
+| `lib/worktrees.js` | 归档工作树安全网：三层只读检测 `plugin:worktree/created`，区分 owned / unknown |
 | `lib/store-jsonl.js` | locate/找目录/找当前 generation/header 解析与重写/目录复制/事务/删除 |
 | `lib/workspace-sync.js` | 移动后的 registry 缓存对账与回滚；删除后的账本清理 |
 | `client.js` | 单文件 Client bundle：设置页、列表/详情、标题/移动/删除表单、i18n、CSS |
@@ -46,11 +47,12 @@
 | 路由 | 说明 |
 |---|---|
 | `GET /state?subagents=0\|1` | 总览；默认过滤子代理会话（分支会话始终返回） |
-| `POST /preview` | 最近消息（最多 10 条） |
+| `POST /preview` | 最近消息（最多 10 条，只含真实对话；响应含 `skipped` = 被隐藏的注入条数） |
 | `POST /title/propose` | 整段会话标题提案（只读） |
 | `POST /title/apply` | 确认写入标题；live 或 cold |
 | `POST /archive` | `{sessionIds, stopActivity?}` |
-| `POST /unarchive` | `{sessionIds}` |
+| `POST /unarchive` | `{sessionIds}`；响应含 `worktrees`（恢复的会话曾创建、已在归档时删除的检出目录） |
+| `POST /worktrees` | `{sessionIds}`：归档前预览会被删除的 git 检出目录（≤`maxBatch`）；无工作树服务时 `supported:false`，无法判定时 `unknown:true` |
 | `POST /delete/preview` | 删除范围预览（根 + 子代理后代 + 分支提示） |
 | `POST /delete` | `{sessionIds, confirm:true}` |
 | `POST /move` | `{sessionIds, workspaceId}` |

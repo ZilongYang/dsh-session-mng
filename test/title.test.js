@@ -5,6 +5,7 @@ import {
   cleanTitleText,
   collectTurns,
   frameTurns,
+  isConversationalUserMessage,
   normalizeTitle,
   shrinkToBudget,
   titleFromText,
@@ -53,6 +54,46 @@ test('collectTurns reads both event shapes and clips long messages', () => {
   )
   assert.ok(long[0].text.startsWith('xxxxx'))
   assert.ok(long[0].text.includes('truncated'))
+})
+
+test('collectTurns drops host-injected user messages and keeps conversation', () => {
+  const limits = { userCharsPerMessage: 100, assistantCharsPerMessage: 100 }
+  const events = [
+    { type: 'user/message', data: { content: [{ type: 'text', text: 'runtime reminder' }], source: { kind: 'runtime-context', form: 'snapshot' } } },
+    { type: 'user/message', data: { content: [{ type: 'text', text: 'real question' }], source: { kind: 'user' } } },
+    { type: 'assistant/message', data: { message: { content: [{ type: 'text', text: 'answer' }] } } },
+    { type: 'user/message', data: { content: [{ type: 'text', text: 'skill list' }], source: { kind: 'skill-catalog', form: 'catalog' } } },
+    { type: 'user/message', data: { content: [{ type: 'text', text: 'memory' }], source: { kind: 'dsh-mnemon', form: 'memory-snapshot' } } },
+    { type: 'user/message', data: { content: [{ type: 'text', text: 'from another agent' }], source: { kind: 'agent-message', form: 'relay' } } },
+    { type: 'user/message', data: { content: [{ type: 'text', text: 'legacy turn' }] } },
+  ]
+  assert.deepEqual(collectTurns(events, limits), [
+    { role: 'user', text: 'real question' },
+    { role: 'assistant', text: 'answer' },
+    { role: 'user', text: 'from another agent' },
+    { role: 'user', text: 'legacy turn' },
+  ])
+})
+
+test('collectTurns falls back to the unfiltered transcript only when asked', () => {
+  const limits = { userCharsPerMessage: 100, assistantCharsPerMessage: 100 }
+  const events = [
+    { type: 'user/message', data: { content: [{ type: 'text', text: 'only injected' }], source: { kind: 'runtime-context' } } },
+  ]
+  assert.deepEqual(collectTurns(events, limits), [])
+  assert.deepEqual(collectTurns(events, limits, { fallbackOnEmpty: true }), [
+    { role: 'user', text: 'only injected' },
+  ])
+})
+
+test('isConversationalUserMessage accepts unknown-free legacy events only', () => {
+  assert.equal(isConversationalUserMessage({ type: 'user/message', data: {} }), true)
+  assert.equal(isConversationalUserMessage({ type: 'user/message', data: { source: { kind: 'user' } } }), true)
+  assert.equal(isConversationalUserMessage({ type: 'user/message', data: { source: { kind: 'agent-message' } } }), true)
+  assert.equal(isConversationalUserMessage({ type: 'user/message', data: { source: {} } }), true)
+  assert.equal(isConversationalUserMessage({ type: 'user/message', data: { source: { kind: 'time-context' } } }), false)
+  assert.equal(isConversationalUserMessage({ type: 'user/message', data: { source: { kind: 'brand-new' } } }), false)
+  assert.equal(isConversationalUserMessage({ type: 'assistant/message', data: {} }), false)
 })
 
 test('shrinkToBudget keeps head and tail and reports truncation', () => {

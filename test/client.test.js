@@ -96,7 +96,7 @@ const {
   blanksFromState,
   normalizeSizes,
   composeGroups,
-  components: { SessionManagerPage, Row, Group, DetailView },
+  components: { SessionManagerPage, Row, Group, DetailView, ArchiveScope, PreviewList },
 } = __test
 
 const WORKSPACES = [
@@ -949,6 +949,15 @@ function walkTree(node, visit) {
   for (const child of node.children ?? []) walkTree(child, visit)
 }
 
+/** Concatenated string children of one rendered tree, for text assertions. */
+function textOf(element) {
+  let out = ''
+  walkTree(element, (node) => {
+    for (const child of node.children ?? []) if (typeof child === 'string') out += `${child} `
+  })
+  return out
+}
+
 function collect(element, type) {
   const found = []
   walkTree(element, (node) => {
@@ -1396,4 +1405,60 @@ test('the legacy fallback renders 50 rows per group, grows on load more and keep
   await instance.flush()
   assert.equal(groupOf('w1').renderedRows.length, 120)
   assert.equal(groupOf('w1').total, 120)
+})
+
+test('ArchiveScope lists the checkouts an archive would delete', () => {
+  const info = {
+    supported: true,
+    rows: [
+      {
+        sessionId: 'session-1',
+        count: 1,
+        worktrees: [{ path: '/repo/.agents/worktrees/wt-1', branch: 'feat/x' }],
+        unknown: false,
+      },
+    ],
+    totals: { sessions: 1, worktrees: 1, unknown: 0 },
+  }
+  const instance = mount(ArchiveScope, { t: smokeT, busy: false, info, onCancel() {}, onConfirmed() {} })
+  const text = textOf(instance.element())
+  assert.ok(text.includes('/repo/.agents/worktrees/wt-1'), text)
+  assert.ok(text.includes('feat/x'), text)
+  assert.ok(text.includes(smokeT('archiveWorktreesIntro')), text)
+})
+
+test('ArchiveScope confirms and reports sessions it could not check', () => {
+  let confirmed = 0
+  const instance = mount(ArchiveScope, {
+    t: smokeT,
+    busy: false,
+    info: { supported: true, rows: [], totals: { sessions: 1, worktrees: 0, unknown: 1 } },
+    onCancel() {},
+    onConfirmed() { confirmed += 1 },
+  })
+  const text = textOf(instance.element())
+  assert.ok(text.includes(smokeT('archiveWorktreesUnknown')), text)
+  const action = collect(instance.element(), 'button')
+    .find((node) => node.children.some((child) => child === smokeT('archiveAnyway')))
+  assert.ok(action, 'the confirm button renders')
+  action.props.onClick()
+  assert.equal(confirmed, 1)
+})
+
+test('PreviewList renders the conversation and the hidden-injection note', async () => {
+  installHost({
+    '/preview': () => ({
+      status: 200,
+      value: {
+        messages: [{ role: 'user', text: 'the real question', time: 1 }],
+        total: 1,
+        skipped: 3,
+      },
+    }),
+  })
+  const instance = mount(PreviewList, { t: smokeT, sessionId: 'session-1' })
+  await instance.flush()
+  const text = textOf(instance.element())
+  assert.ok(text.includes('the real question'), text)
+  assert.ok(text.includes(smokeT('previewSkipped')), text)
 })

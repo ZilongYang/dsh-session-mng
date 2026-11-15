@@ -1,6 +1,13 @@
 # Roadmap
 
-> 当前：`0.2.3` 已发布（npm latest / tag `v0.2.3` / Release，2026-11-06）：工作区归属自检 + 一键归位（左侧栏只渲染工作区账本，账本漏登记时用按钮 attachSession 补回；纯账本写、不改日志）。1 次实机验收：点按钮后左侧栏即时出现、账本 10→12。`0.2.2` 已发布（npm latest / tag `v0.2.2` / Release，2026-11-05）：DSH 0.2.2 的独立 fork 适配 + 投影读取迁移 + 移除「刷新页面」按钮。依据 [docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md](docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md) 与 [docs/PLAN-2026-11-05-dsh-0.2.2-compat.md](docs/PLAN-2026-11-05-dsh-0.2.2-compat.md)。
+> 当前：`0.2.4` **已实现、待实机验收后发布**（2026-11-15）：消息口径修复（标题/最近消息只认真实对话）+ 归档 × 工作树安全网（命中工作树才弹确认、恢复与详情页提示、`POST /worktrees`）。164 测试全绿，依据 [docs/COMPAT-2026-11-15-dsh-0.2.2-rc.3.md](docs/COMPAT-2026-11-15-dsh-0.2.2-rc.3.md) 与 [docs/PLAN-2026-11-15.md](docs/PLAN-2026-11-15.md)。`0.2.3` 已发布（npm latest / tag `v0.2.3` / Release，2026-11-06）：工作区归属自检 + 一键归位（左侧栏只渲染工作区账本，账本漏登记时用按钮 attachSession 补回；纯账本写、不改日志）。1 次实机验收：点按钮后左侧栏即时出现、账本 10→12。`0.2.2` 已发布（npm latest / tag `v0.2.2` / Release，2026-11-05）：DSH 0.2.2 的独立 fork 适配 + 投影读取迁移 + 移除「刷新页面」按钮。依据 [docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md](docs/COMPAT-2026-11-05-dsh-0.2.2-rc.1.md) 与 [docs/PLAN-2026-11-05-dsh-0.2.2-compat.md](docs/PLAN-2026-11-05-dsh-0.2.2-compat.md)。
+
+## 0.2.4 — implemented (awaiting on-device acceptance)
+
+- 消息口径：`collectTurns()` 与 `preview()` 只把 `source.kind` 为 `user` / `agent-message`（或无 `source` 的老日志）当用户轮；标题侧过滤后为空则退回旧口径，预览侧显示空态并标注「已隐藏 N 条系统注入」（`/preview` 新增 `skipped`）。
+- 归档 × 工作树安全网：`lib/worktrees.js` 三层检测（live 投影 → 持久投影 → 受 `worktreeScanMaxBytes` 限制的日志扫描），只统计 `owned: true`；无法判定诚实返回 `unknown`。
+- `POST /worktrees` 只读路由；归档前仅命中时弹确认；`POST /unarchive` 响应加 `worktrees` 并给恢复 toast；已归档详情页常驻提示。
+- 兼容矩阵补 `0.2.2-rc.2` / `0.2.2-rc.3`；164 测试全绿；实机验收与发版待执行，见 [docs/RELEASE-CHECKLIST-0.2.4.md](docs/RELEASE-CHECKLIST-0.2.4.md)。
 
 ## 0.2.3 — delivered (published)
 

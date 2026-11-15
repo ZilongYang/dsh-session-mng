@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.2.4 — 2026-11-15
+
+### Changed
+
+- **「最近消息」与整段标题不再把系统注入当用户消息**。DSH 0.2.x 会在会话里写入大量 `source.kind` 不是 `user` 的 `user/message`（每轮的运行时提醒、时间上下文、技能目录、MNEMON 记忆快照、工具/子代理通知、审批策略通知）。插件此前只看 `event.type`，于是：
+  - 详情页「最近消息」几乎永远显示 5 条 `<system-reminder>` / 记忆快照，看不到用户自己说的话；
+  - 整段标题生成的输入被噪音淹没，`shrinkToBudget` 还会从中间删掉真实轮次、把技能目录留下。
+
+  实测 120 个会话日志：**1005 条 `user/message` 里只有 324 条（32%）是真人输入**（`user`）+ 真实 agent 消息（`agent-message`）。现在是白名单：`user`、`agent-message`（form `relay`）、以及没有 `source` 字段的老日志；其余（含未知新 kind）一律视为注入。
+  - 标题侧：过滤后若一个用户轮都不剩，**退回旧口径**，任何会话仍能出标题；
+  - 预览侧：**不兜底**，显示空态；`POST /preview` 响应新增 `skipped`（本次窗口内被隐藏的注入条数，纯加法），客户端显示「已隐藏 N 条系统注入」。
+  - 未改变 wire 形状：既有字段不变，只新增 `skipped`。
+
+### Added
+
+- **归档 × 工作树安全网（适配 DSH 0.2.2-rc.2 起的工作树回收）**。宿主自 rc.2 起会在**归档**时删除该会话创建且干净的检出目录（分支保留；未提交改动、被忽略文件会丢失）。插件归档走 `workspaceRegistry.archiveSession()`，同样触发，但此前没有任何提示。
+  - 新只读路由 `POST /worktrees`（`{sessionIds}` ≤ `maxBatch`）：三层检测（`sessionProjections.snapshot` → `sessionProjectionCache.cachedSnapshot` → 受 `worktreeScanMaxBytes` 限制的日志扫描），只统计 `owned: true` 的创建；无法判定（日志超限、fork 继承边界不可知、宿主没挂工作树服务）**诚实返回 `unknown` / `supported:false`，绝不假装「没有」**。
+  - 归档前**仅在命中工作树时**弹确认框（列路径 +「分支保留，检出目录与未提交/被忽略文件会丢失」+ 指向 `retainOnArchive`），其余情况保持今天的一键归档。
+  - 恢复后 toast 追加「曾创建 N 个工作树，检出目录已在归档时删除（分支保留），需要时用「恢复工作树」」；`POST /unarchive` 响应新增 `worktrees`（纯加法）。
+  - 已归档会话的详情页常驻一行同义提示。
+  - 新配置 `worktreeScanMaxBytes`（默认 8 MB，范围 64 KB–512 MB）。
+- **兼容矩阵补 `0.2.2-rc.2` / `0.2.2-rc.3`**（此前只到 `0.2.2-rc.1`）。
+
+### Compatibility
+
+- 实测宿主 DSH `0.2.2-rc.3`（桌面 App 与全局 CLI，均为 rc.3）：`/overview` 200 且 `source: "catalog"`（零 IO 快路径生效）、`/sessions` 200、`/misplaced` 200；`dsh-workspace` 的 `archiveSession` / `unarchiveSession` / `attachSession` / `archivedSessionIds` / `pinnedSessionIds` 签名未变。
+- 官方升级指南 rc.1 → rc.2 共 19 条，与本插件使用面相交的只有 `archive-worktrees` 一条；rc.2 → rc.3 无新指南目录。
+- **164 个测试全绿**（新增 20 条：注入过滤/兜底/老日志/`agent-message`、预览 `skipped`、工作树记录解析、投影 owned 过滤、三层检测、超限 unknown、fork 继承 unknown、`/worktrees` 路由、`unarchive` 附带工作树）。
+- 相关文档：[docs/COMPAT-2026-11-15-dsh-0.2.2-rc.3.md](docs/COMPAT-2026-11-15-dsh-0.2.2-rc.3.md)、[docs/PLAN-2026-11-15.md](docs/PLAN-2026-11-15.md)、[docs/RELEASE-CHECKLIST-0.2.4.md](docs/RELEASE-CHECKLIST-0.2.4.md)。
+
 ## 0.2.3 — 2026-11-06
 
 ### Added
