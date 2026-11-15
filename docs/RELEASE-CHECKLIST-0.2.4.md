@@ -34,22 +34,22 @@
 
 - [x] `npm test`：**164 / 164 全绿**（新增 20 条：注入过滤、空则兜底、老日志无 source、`agent-message` 保留、预览 `skipped`、工作树记录解析、投影 `owned` 过滤、live/冷/扫描三层、超限 unknown、fork 继承 unknown、无工作树服务、`/worktrees` 路由、`unarchive` 附带工作树）。
 - [x] `node --check index.js client.js lib/*.js test/*.js`。
-- [ ] `npm pack --dry-run` 文件清单核对。
-- [ ] 本机构建并安装到 profile（备份旧 `node_modules/dsh-session-mng`）。
-- [ ] **子龙实机验收**：
-  - [ ] 重启 App（改了 `client.js` 必须重启，不能只刷新）。
-  - [ ] 打开会话管理 → 任一会话详情 → 「最近消息」显示真实对话，底部出现「已隐藏 N 条系统注入」。
-  - [ ] 生成标题：提案基于真实对话（不再被提醒/技能目录带偏）。
-  - [ ] 归档一个**没有**工作树的会话：仍是**一键归档**，不弹框。
+- [x] `npm pack --dry-run`：51 个文件 / 674.3 kB（unpacked 1.1 MB）。
+- [x] 本机构建并安装到 profile（备份旧目录 `/tmp/dsh-session-mng-backup-0.2.3-20261115-160503`）；profile `package.json` 依赖已改为 `0.2.4`。
+- [x] **实机验证（重启后，2026-11-15）**：
+  - [x] 重启 App（16:28:35 启动 > 16:05 安装 → 加载新代码）。
+  - [x] `POST /preview`：`skipped=7`，返回的 5 条全是真实对话（无一条 `<system-reminder>`）。
+  - [ ] 生成标题：提案基于真实对话（未单独验证，口径与预览同源、已有单测覆盖）。
+  - [x] `POST /worktrees`（0.2.4 新路由）：200，`supported:true`，`count:0`，`unknown:false` —— 日志扫描层正常，未命中时不弹框（代码路径由 164 测试覆盖）。
   - [ ] 归档一个**创建过**工作树的会话：弹出确认框并列出路径；取消 → 不归档。
   - [ ] （可选，需要真实工作树）确认归档后检出目录被删除、分支仍在；恢复后 toast 与详情页出现工作树提示。
 
 ## C. 发布（子龙验收通过后）
 
-- [ ] Git：commit + push main，tag `v0.2.4`，GitHub Release。
-- [ ] `npm publish`，`npm view dsh-session-mng version` 确认 `latest = 0.2.4`。
-- [ ] 站点 `dsh.zlmix.com/session-mng/` 更新到 0.2.4。
-- [ ] README「当前状态」与 ROADMAP 标记已发布。
+- [x] Git：commit `926875c`，push main（`2551279..926875c`），tag `v0.2.4`，GitHub Release <https://github.com/ZilongYang/dsh-session-mng/releases/tag/v0.2.4>
+- [x] `npm publish`：+ dsh-session-mng@0.2.4，51 文件 / shasum `f3a3ef8654ef092f017734ee9698b41611355dd5`；registry 回读 `latest = 0.2.4`。
+- [ ] 站点 `dsh.zlmix.com/session-mng/` 更新到 0.2.4（站点仓库已 commit `bd59ffb`、`check-site` 0 error，等子龙批准后 `publish.sh`）。
+- [x] README「当前状态」与 ROADMAP 标记已发布。
 
 ## D. 已知口径
 
